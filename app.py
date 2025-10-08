@@ -11,30 +11,31 @@ DATA_FILE = "Book3.xlsx - MAIN DATA 07.10.25.csv"
 def load_data(file_path):
     """
     Loads and caches data from the CSV file, trying different encodings 
-    to handle file structure and encoding errors.
+    and the Python engine to handle file structure and encoding errors.
     """
     if not os.path.exists(file_path):
         st.error(f"Data file not found: {file_path}. Please ensure it is in the same directory.")
         return pd.DataFrame()
     
     # Try common encodings and include error handling for bad lines
-    # FIX: on_bad_lines='skip' is added to ignore rows with too many/few columns.
+    # FIX: engine='python' is added to handle complex parsing issues like buffer overflow
     for encoding in ['utf-8', 'latin-1', 'cp1252']:
         try:
-            df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip')
+            # Attempt to read the CSV using the more flexible Python engine
+            df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip', engine='python')
             
             # --- Optional Logging for Debugging ---
-            # If you see a lot of missing data, remove on_bad_lines='skip' and fix the CSV source file.
-            st.success(f"Data loaded successfully using {encoding} encoding. (Some bad lines may have been skipped)")
+            st.success(f"Data loaded successfully using {encoding} encoding and Python engine. (Some bad lines may have been skipped)")
             
             return df
         except UnicodeDecodeError:
             continue
         except Exception as e:
-            st.error(f"An unexpected error occurred while loading with {encoding}: {e}")
-            return pd.DataFrame()
+            # If a complex error occurs (like the Buffer overflow), log it and continue trying other encodings
+            st.warning(f"Failed to read with {encoding} and Python engine. Trying next encoding. Error: {e}")
+            continue
     
-    st.error("Failed to read CSV with common encodings. Please check the file's encoding or structure.")
+    st.error("Failed to read CSV with all common encodings and the Python engine. Please check the file's encoding or structure.")
     return pd.DataFrame()
 
 # --- Load Data and Handle Failure ---
