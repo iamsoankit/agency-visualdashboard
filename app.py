@@ -89,6 +89,12 @@ selected_category = st.sidebar.selectbox(
     options=['All Categories'] + sorted(df['category'].astype(str).unique().tolist())
 )
 
+# Filter 3: Agency Name Selection (NEW FILTER)
+selected_agency = st.sidebar.selectbox(
+    "Select Agency Name:",
+    options=['All Agencies'] + sorted(df['agency_name'].astype(str).unique().tolist())
+)
+
 # Apply Filters
 df_filtered = df.copy()
 
@@ -98,6 +104,10 @@ if selected_state != 'All States':
 
 if selected_category != 'All Categories':
     df_filtered = df_filtered[df_filtered['category'] == selected_category]
+
+# Apply NEW Agency Name Filter
+if selected_agency != 'All Agencies':
+    df_filtered = df_filtered[df_filtered['agency_name'] == selected_agency]
 
 
 # --- 2. Calculate KPIs on Filtered Data ---
@@ -111,17 +121,21 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-st.set_page_config(layout="wide")
+# Added 'theme="light"' to explicitly set light mode
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard", theme="light")
 st.title("💰 Agency Expenditure Dashboard (Live Data)")
-st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}** | Auto-refreshes every 60 seconds.")
+st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}** | Agency: **{selected_agency}** | Auto-refreshes every 60 seconds.")
 st.divider()
 
-# KPI Header
+# Define the currency symbol
+CURRENCY = "₹" # Rupee symbol for INR
+
+# KPI Header - Currency changed to INR (₹)
 col1, col2, col3, col4 = st.columns(4)
-# Displaying values in Millions (M) for better readability
-col1.metric("Total Budget Assigned (M)", f"${total_limit:,.2f}")
-col2.metric("Total Success (M)", f"${total_success:,.2f}", delta_color="normal")
-col3.metric("Total Pending (M)", f"${total_pending:,.2f}")
+# Displaying values in Millions (M)
+col1.metric("Total Budget Assigned (M)", f"{CURRENCY}{total_limit:,.2f}")
+col2.metric("Total Success (M)", f"{CURRENCY}{total_success:,.2f}", delta_color="normal")
+col3.metric("Total Pending (M)", f"{CURRENCY}{total_pending:,.2f}")
 col4.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
 
 
