@@ -114,6 +114,7 @@ if selected_agency != 'All Agencies':
 total_limit = df_filtered['child_expenditure_limit_assigned'].sum()
 total_success = df_filtered['success'].sum()
 total_pending = df_filtered['pending'].sum()
+total_reinitiated = df_filtered['re_initiated'].sum() # NEW CALCULATION
 total_balance = df_filtered['balance'].sum()
 
 # Safe calculation for success rate
@@ -124,19 +125,41 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 # REMOVED theme="light" as it is not a valid parameter for st.set_page_config
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
 st.title("💰 Agency Expenditure Dashboard (Live Data)")
-st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}** | Agency: **{selected_agency}** | Auto-refreshes every 60 seconds.")
+
+# Get the list of unique states in the filtered data for display
+filtered_states = df_filtered['state'].astype(str).unique().tolist()
+display_states = ", ".join(filtered_states[:3])
+if len(filtered_states) > 3:
+    display_states += f" (+{len(filtered_states) - 3} more)"
+elif len(filtered_states) == 0:
+    display_states = "None"
+elif len(filtered_states) == 1:
+    display_states = filtered_states[0]
+else:
+    display_states = ", ".join(filtered_states)
+    
+# Updated Markdown to show the State name(s) clearly
+st.markdown(f"""
+    **Data displayed for:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | *Auto-refreshes every 60 seconds.*
+""")
 st.divider()
 
 # Define the currency symbol
 CURRENCY = "₹" # Rupee symbol for INR
 
-# KPI Header - Currency changed to INR (₹)
-col1, col2, col3, col4 = st.columns(4)
-# Displaying values in Millions (M)
+# KPI Header - Now using 5 columns (Total Limit, Success, Pending, Re-Initiated, Balance)
+# We will use 5 columns (5 metrics) + 1 for Success Rate (6 total metrics)
+col1, col2, col3, col4, col5, col6 = st.columns(6) 
+
+# Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
+
 col1.metric("Total Budget Assigned (M)", f"{CURRENCY}{total_limit:,.2f}")
 col2.metric("Total Success (M)", f"{CURRENCY}{total_success:,.2f}", delta_color="normal")
-col3.metric("Total Pending (M)", f"{CURRENCY}{total_pending:,.2f}")
-col4.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
+col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
+# NEW METRICS ADDED
+col4.metric("Total Pending (M)", f"{CURRENCY}{total_pending:,.2f}")
+col5.metric("Total Re-Initiated (M)", f"{CURRENCY}{total_reinitiated:,.2f}")
+col6.metric("Total Balance (M)", f"{CURRENCY}{total_balance:,.2f}")
 
 
 # --- Main Visualizations ---
