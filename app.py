@@ -1,12 +1,19 @@
 import streamlit as st
 import pandas as pd
 import os
+import requests # Need this for fetching data from a URL
 
 # --- Configuration ---
-# NOTE: Ensure this CSV file is uploaded to the same directory as app.py
-DATA_FILE = "Book3.xlsx - MAIN DATA 07.10.25.csv"
+# Google Sheet ID extracted from your URL: 
+# https://docs.google.com/spreadsheets/d/1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo/edit?gid=1933215839#gid=1933215839
+SHEET_ID = '1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo'
+# The gid is for the specific sheet tab within the file (MAIN DATA 07.10.25)
+GID = '1933215839' 
 
-# Define the expected, clean column names corresponding to the original 11 columns
+# Construct the public CSV export URL for the specific sheet tab
+DATA_URL = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}'
+
+# Define the expected, clean column names (same as before)
 CLEAN_COLUMN_NAMES = [
     'sr_no', 'agency_name', 'unique_id', 'state', 'agency_type', 
     'category', 'child_expenditure_limit_assigned', 'success', 
@@ -14,71 +21,50 @@ CLEAN_COLUMN_NAMES = [
 ]
 
 # Function to load data safely and efficiently
-@st.cache_data
-def load_data(file_path):
+@st.cache_data(ttl=60) # Cache for 60 seconds to enable "real-time" feel
+def load_data(url):
     """
-    Loads and caches data from the CSV file, skipping the original header
-    and applying clean column names to prevent KeyError.
+    Loads data directly from the Google Sheet CSV export URL.
+    This bypasses local file issues and is more reliable for live data.
     """
-    if not os.path.exists(file_path):
-        st.error(f"Data file not found: {file_path}. Please ensure it is in the same directory.")
-        return pd.DataFrame()
-    
-    # Try common encodings and include error handling for bad lines
-    for encoding in ['utf-8', 'latin-1', 'cp1252']:
-        try:
-            # FIX: Skip the malformed header (header=None), use Python engine for stability,
-            # and use the clean column names defined above.
-            df = pd.read_csv(
-                file_path, 
-                encoding=encoding, 
-                on_bad_lines='skip', 
-                engine='python',
-                header=0 # Read the first row as header temporarily
-            )
-            
-            # --- Aggressive Header Replacement ---
-            # Reload, skipping the header row, and manually assigning clean names
-            df = pd.read_csv(
-                file_path, 
-                encoding=encoding, 
-                on_bad_lines='skip', 
-                engine='python',
-                header=None,  # Skip header row
-                names=CLEAN_COLUMN_NAMES # Assign clean names
-            )
+    try:
+        # Use pandas read_csv directly on the URL
+        # We assume the data starts immediately (no malformed header)
+        df = pd.read_csv(
+            url, 
+            header=None, # Skip the default header row
+            names=CLEAN_COLUMN_NAMES, # Assign clean column names
+            skiprows=1 # Skip the actual header row from the sheet
+        )
+        
+        # Check if the data fetch was successful but returned an error page (common issue)
+        if len(df.columns) != len(CLEAN_COLUMN_NAMES):
+            st.error("Data loading failed. Check if the Google Sheet link is public and the GID is correct.")
+            return pd.DataFrame()
 
-            # Drop the first row (the actual malformed header) after assignment
-            df = df.iloc[1:].copy()
-            
-            # --- Optional Logging for Debugging ---
-            st.success(f"Data loaded successfully using {encoding} encoding and explicit header assignment. (Malformed header row skipped)")
-            
-            return df
-        except UnicodeDecodeError:
-            continue
-        except Exception as e:
-            # If a complex error occurs, log it and continue trying other encodings
-            st.warning(f"Failed to read with {encoding} and header fix. Trying next encoding. Error: {e}")
-            continue
-    
-    st.error("Failed to read CSV with all common encodings and the Python engine. Please check the file's encoding or structure.")
-    return pd.DataFrame()
+        st.success("Data loaded successfully from Google Sheet URL.")
+        return df
+
+    except Exception as e:
+        st.error(f"Failed to fetch data from Google Sheet URL. Error: {e}")
+        return pd.DataFrame()
 
 # --- Load Data and Handle Failure ---
-df = load_data(DATA_FILE)
+df = load_data(DATA_URL)
 
 if df.empty:
     st.stop() # Stop the script if data failed to load
 
-# The column names are now guaranteed to be clean, so we remove the redundant cleaning step.
-# The numeric columns are already defined based on the fixed list.
+# The column names are now guaranteed to be clean.
 numeric_cols = ['child_expenditure_limit_assigned', 'success', 'pending', 're_initiated', 'balance']
 
 # Ensure numeric columns are actually numeric after loading
 for col in numeric_cols:
-    # We no longer need the error check because the names are fixed.
-    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) # 'coerce' turns non-numeric text into NaN, then fill NaN with 0
+    # Handle the fact that non-English languages/locales sometimes use commas (,) for decimal separators.
+    # We will use regex to clean up potential non-numeric characters before conversion.
+    # This addresses the "data entry is in different language" issue for numbers.
+    df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
+    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) 
 
 # --- Sidebar Filters ---
 st.sidebar.header("Filter Data")
@@ -117,8 +103,8 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 # --- 3. Dashboard Layout ---
 st.set_page_config(layout="wide")
-st.title("💰 Agency Expenditure Dashboard")
-st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}**")
+st.title("💰 Agency Expenditure Dashboard (Live Data)")
+st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}** | Auto-refreshes every 60 seconds.")
 st.divider()
 
 # KPI Header
