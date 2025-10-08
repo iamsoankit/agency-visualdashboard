@@ -89,10 +89,16 @@ selected_category = st.sidebar.selectbox(
     options=['All Categories'] + sorted(df['category'].astype(str).unique().tolist())
 )
 
-# Filter 3: Agency Name Selection (NEW FILTER)
+# Filter 3: Agency Name Selection 
 selected_agency = st.sidebar.selectbox(
     "Select Agency Name:",
     options=['All Agencies'] + sorted(df['agency_name'].astype(str).unique().tolist())
+)
+
+# Filter 4: Unique ID Selection (NEW FILTER)
+selected_unique_id = st.sidebar.selectbox(
+    "Agency Unique Code:",
+    options=['All Codes'] + sorted(df['unique_id'].astype(str).unique().tolist())
 )
 
 # Apply Filters
@@ -105,9 +111,13 @@ if selected_state != 'All States':
 if selected_category != 'All Categories':
     df_filtered = df_filtered[df_filtered['category'] == selected_category]
 
-# Apply NEW Agency Name Filter
+# Apply Agency Name Filter
 if selected_agency != 'All Agencies':
     df_filtered = df_filtered[df_filtered['agency_name'] == selected_agency]
+
+# Apply NEW Unique ID Filter
+if selected_unique_id != 'All Codes':
+    df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
 # Add instruction for theme switching in the sidebar (NEW)
 st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
@@ -142,7 +152,7 @@ else:
     
 # Updated Markdown to show the State name(s) clearly
 st.markdown(f"""
-    **Data displayed for:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | *Auto-refreshes every 60 seconds.*
+    **Data displayed for:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Auto-refreshes every 60 seconds.*
 """)
 st.divider()
 
