@@ -121,8 +121,8 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-# Added 'theme="light"' to explicitly set light mode
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard", theme="light")
+# REMOVED theme="light" as it is not a valid parameter for st.set_page_config
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
 st.title("💰 Agency Expenditure Dashboard (Live Data)")
 st.markdown(f"**Data displayed for:** State: **{selected_state}** | Category: **{selected_category}** | Agency: **{selected_agency}** | Auto-refreshes every 60 seconds.")
 st.divider()
