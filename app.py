@@ -76,46 +76,61 @@ for col in numeric_cols:
 # --- Sidebar Filters ---
 st.sidebar.header("Filter Data")
 
-# Filter 1: State Selection (Using cleaned 'state' column)
-# Using str.upper() to ensure consistent filtering if state names have mixed cases
+# --- Start Cascading Filters ---
+# 1. State Selection (Always independent)
 selected_state = st.sidebar.selectbox(
     "Select State:",
     options=['All States'] + sorted(df['state'].astype(str).str.upper().unique().tolist())
 )
 
-# Filter 2: Category Selection (Using cleaned 'category' column)
+# DataFrame filtered by State
+df_for_category_selection = df.copy()
+if selected_state != 'All States':
+    df_for_category_selection = df_for_category_selection[df_for_category_selection['state'].astype(str).str.upper() == selected_state]
+
+# 2. Category Selection (Depends on State)
 selected_category = st.sidebar.selectbox(
     "Select Category:",
-    options=['All Categories'] + sorted(df['category'].astype(str).unique().tolist())
+    options=['All Categories'] + sorted(df_for_category_selection['category'].astype(str).unique().tolist())
 )
 
-# Filter 3: Agency Name Selection 
+# DataFrame filtered by State and Category
+df_for_agency_selection = df_for_category_selection.copy()
+if selected_category != 'All Categories':
+    df_for_agency_selection = df_for_agency_selection[df_for_agency_selection['category'] == selected_category]
+
+# 3. Agency Name Selection (Depends on State and Category)
 selected_agency = st.sidebar.selectbox(
     "Select Agency Name:",
-    options=['All Agencies'] + sorted(df['agency_name'].astype(str).unique().tolist())
+    options=['All Agencies'] + sorted(df_for_agency_selection['agency_name'].astype(str).unique().tolist())
 )
 
-# Filter 4: Unique ID Selection (NEW FILTER)
+# DataFrame filtered by State, Category, and Agency Name
+df_for_unique_code_selection = df_for_agency_selection.copy()
+if selected_agency != 'All Agencies':
+    df_for_unique_code_selection = df_for_unique_code_selection[df_for_unique_code_selection['agency_name'] == selected_agency]
+
+# 4. Unique ID Selection (Depends on State, Category, and Agency Name)
 selected_unique_id = st.sidebar.selectbox(
     "Agency Unique Code:",
-    options=['All Codes'] + sorted(df['unique_id'].astype(str).unique().tolist())
+    options=['All Codes'] + sorted(df_for_unique_code_selection['unique_id'].astype(str).unique().tolist())
 )
+# --- End Cascading Filters ---
 
-# Apply Filters
+
+# Apply Filters (This block now ensures all 4 selections filter the data,
+# but the available options in 2, 3, and 4 are constrained by earlier selections.)
 df_filtered = df.copy()
 
 if selected_state != 'All States':
-    # Filter the DataFrame based on the normalized state name
     df_filtered = df_filtered[df_filtered['state'].astype(str).str.upper() == selected_state]
 
 if selected_category != 'All Categories':
     df_filtered = df_filtered[df_filtered['category'] == selected_category]
 
-# Apply Agency Name Filter
 if selected_agency != 'All Agencies':
     df_filtered = df_filtered[df_filtered['agency_name'] == selected_agency]
 
-# Apply NEW Unique ID Filter
 if selected_unique_id != 'All Codes':
     df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
