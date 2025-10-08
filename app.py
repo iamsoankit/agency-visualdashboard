@@ -109,6 +109,8 @@ if selected_category != 'All Categories':
 if selected_agency != 'All Agencies':
     df_filtered = df_filtered[df_filtered['agency_name'] == selected_agency]
 
+# Add instruction for theme switching in the sidebar (NEW)
+st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
 
 # --- 2. Calculate KPIs on Filtered Data ---
 total_limit = df_filtered['child_expenditure_limit_assigned'].sum()
@@ -122,11 +124,7 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-# NOTE ON LIGHT MODE: Streamlit sets the theme based on the user's OS preference by default.
-# To force a light theme globally, you must create a directory named `.streamlit` in your project
-# root and add a file named `config.toml` with the content: 
-# [theme]
-# base = "light"
+# Removed confusing theme comments, relying on native Streamlit theme selection
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
 st.title("💰 Agency Expenditure Dashboard (Live Data)")
 
@@ -149,8 +147,7 @@ st.markdown(f"""
 st.divider()
 
 # --- SCALING AND CURRENCY ---
-# To display amounts in Crores (Cr), we divide the sums by 100. 
-# Adjust this factor (100) based on your specific financial unit definition.
+# To display amounts in Crores (Cr), we divide the sums by 10.
 CRORE_FACTOR = 10 
 CURRENCY_LABEL = "INR (Cr)" 
 
