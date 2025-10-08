@@ -11,17 +11,22 @@ DATA_FILE = "Book3.xlsx - MAIN DATA 07.10.25.csv"
 def load_data(file_path):
     """
     Loads and caches data from the CSV file, trying different encodings 
-    to handle the common UnicodeDecodeError.
+    to handle file structure and encoding errors.
     """
     if not os.path.exists(file_path):
         st.error(f"Data file not found: {file_path}. Please ensure it is in the same directory.")
         return pd.DataFrame()
     
-    # Try common encodings to avoid UnicodeDecodeError
+    # Try common encodings and include error handling for bad lines
+    # FIX: on_bad_lines='skip' is added to ignore rows with too many/few columns.
     for encoding in ['utf-8', 'latin-1', 'cp1252']:
         try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            st.success(f"Data loaded successfully using {encoding} encoding.")
+            df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip')
+            
+            # --- Optional Logging for Debugging ---
+            # If you see a lot of missing data, remove on_bad_lines='skip' and fix the CSV source file.
+            st.success(f"Data loaded successfully using {encoding} encoding. (Some bad lines may have been skipped)")
+            
             return df
         except UnicodeDecodeError:
             continue
@@ -29,7 +34,7 @@ def load_data(file_path):
             st.error(f"An unexpected error occurred while loading with {encoding}: {e}")
             return pd.DataFrame()
     
-    st.error("Failed to read CSV with common encodings. Please check the file's encoding.")
+    st.error("Failed to read CSV with common encodings. Please check the file's encoding or structure.")
     return pd.DataFrame()
 
 # --- Load Data and Handle Failure ---
@@ -38,19 +43,24 @@ df = load_data(DATA_FILE)
 if df.empty:
     st.stop() # Stop the script if data failed to load
 
+# Ensure numeric columns are actually numeric after loading
+numeric_cols = ['Child Expenditure Limit Assigned', 'Success', 'Pending', 'Re-Initiated', 'Balance']
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) # 'coerce' turns non-numeric text into NaN, then fill NaN with 0
+
 # --- Sidebar Filters ---
 st.sidebar.header("Filter Data")
 
 # Filter 1: State Selection
 selected_state = st.sidebar.selectbox(
     "Select State:",
-    options=['All States'] + sorted(df['State'].unique().tolist())
+    options=['All States'] + sorted(df['State'].astype(str).unique().tolist())
 )
 
 # Filter 2: Category Selection
 selected_category = st.sidebar.selectbox(
     "Select Category:",
-    options=['All Categories'] + sorted(df['Category'].unique().tolist())
+    options=['All Categories'] + sorted(df['Category'].astype(str).unique().tolist())
 )
 
 # Apply Filters
@@ -94,6 +104,7 @@ col_vis1, col_vis2 = st.columns(2)
 # Visualization 1: Expenditure Status by Category
 with col_vis1:
     st.subheader("📊 Expenditure Breakdown by Category Status")
+    # Group and ensure no NaN columns before sum
     category_summary = df_filtered.groupby('Category')[['Success', 'Pending', 'Re-Initiated']].sum()
     st.bar_chart(category_summary)
 
