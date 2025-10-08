@@ -43,44 +43,57 @@ df = load_data(DATA_FILE)
 if df.empty:
     st.stop() # Stop the script if data failed to load
 
-# --- FIX for KeyError: Strip whitespace from all column names ---
+# --- FIX for KeyError: AGGRESSIVE COLUMN CLEANING ---
+# 1. Strip all leading/trailing whitespace
 df.columns = df.columns.str.strip()
 
+# 2. Convert to lowercase and replace spaces/special characters with underscores
+# This ensures we have clean, consistent column names regardless of hidden characters.
+df.columns = df.columns.str.lower().str.replace(' ', '_', regex=False).str.replace(r'[^\w]+', '', regex=True)
+
+# Update the list of expected column names to the new, clean format
+numeric_cols = ['child_expenditure_limit_assigned', 'success', 'pending', 're_initiated', 'balance']
+
 # Ensure numeric columns are actually numeric after loading
-numeric_cols = ['Child Expenditure Limit Assigned', 'Success', 'Pending', 'Re-Initiated', 'Balance']
 for col in numeric_cols:
+    # Check if the cleaned column name exists before trying to access it
+    if col not in df.columns:
+        st.error(f"Critical Error: Required column '{col}' not found after cleaning header. The original header name might be severely malformed.")
+        st.dataframe(df.columns.tolist())
+        st.stop()
+        
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) # 'coerce' turns non-numeric text into NaN, then fill NaN with 0
 
 # --- Sidebar Filters ---
 st.sidebar.header("Filter Data")
 
-# Filter 1: State Selection
+# Filter 1: State Selection (Using cleaned 'state' column)
 selected_state = st.sidebar.selectbox(
     "Select State:",
-    options=['All States'] + sorted(df['State'].astype(str).unique().tolist())
+    options=['All States'] + sorted(df['state'].astype(str).unique().tolist())
 )
 
-# Filter 2: Category Selection
+# Filter 2: Category Selection (Using cleaned 'category' column)
 selected_category = st.sidebar.selectbox(
     "Select Category:",
-    options=['All Categories'] + sorted(df['Category'].astype(str).unique().tolist())
+    options=['All Categories'] + sorted(df['category'].astype(str).unique().tolist())
 )
 
 # Apply Filters
 df_filtered = df.copy()
 
 if selected_state != 'All States':
-    df_filtered = df_filtered[df_filtered['State'] == selected_state]
+    df_filtered = df_filtered[df_filtered['state'] == selected_state]
 
 if selected_category != 'All Categories':
-    df_filtered = df_filtered[df_filtered['Category'] == selected_category]
+    df_filtered = df_filtered[df_filtered['category'] == selected_category]
 
 
 # --- 2. Calculate KPIs on Filtered Data ---
-total_limit = df_filtered['Child Expenditure Limit Assigned'].sum()
-total_success = df_filtered['Success'].sum()
-total_pending = df_filtered['Pending'].sum()
-total_balance = df_filtered['Balance'].sum()
+total_limit = df_filtered['child_expenditure_limit_assigned'].sum()
+total_success = df_filtered['success'].sum()
+total_pending = df_filtered['pending'].sum()
+total_balance = df_filtered['balance'].sum()
 
 # Safe calculation for success rate
 success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
@@ -108,7 +121,7 @@ col_vis1, col_vis2 = st.columns(2)
 with col_vis1:
     st.subheader("📊 Expenditure Breakdown by Category Status")
     # Group and ensure no NaN columns before sum
-    category_summary = df_filtered.groupby('Category')[['Success', 'Pending', 'Re-Initiated']].sum()
+    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum()
     st.bar_chart(category_summary)
 
 # Visualization 2: Top 10 States by Limit
@@ -117,8 +130,8 @@ with col_vis2:
     
     # Check if a state filter is applied before showing Top 10 states
     if selected_state == 'All States':
-        state_summary = df_filtered.groupby('State')['Child Expenditure Limit Assigned'].sum().nlargest(10).reset_index()
-        state_summary = state_summary.set_index('State')
+        state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
+        state_summary = state_summary.set_index('state')
         st.bar_chart(state_summary)
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
