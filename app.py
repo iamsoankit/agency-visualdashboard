@@ -122,7 +122,11 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-# REMOVED theme="light" as it is not a valid parameter for st.set_page_config
+# NOTE ON LIGHT MODE: Streamlit sets the theme based on the user's OS preference by default.
+# To force a light theme globally, you must create a directory named `.streamlit` in your project
+# root and add a file named `config.toml` with the content: 
+# [theme]
+# base = "light"
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
 st.title("💰 Agency Expenditure Dashboard (Live Data)")
 
@@ -144,22 +148,31 @@ st.markdown(f"""
 """)
 st.divider()
 
-# Define the currency symbol
-CURRENCY = "₹" # Rupee symbol for INR
+# --- SCALING AND CURRENCY ---
+# To display amounts in Crores (Cr), we divide the sums by 100. 
+# Adjust this factor (100) based on your specific financial unit definition.
+CRORE_FACTOR = 10 
+CURRENCY_LABEL = "INR (Cr)" 
 
-# KPI Header - Now using 5 columns (Total Limit, Success, Pending, Re-Initiated, Balance)
-# We will use 5 columns (5 metrics) + 1 for Success Rate (6 total metrics)
+# Scale the KPIs to Crores
+limit_cr = total_limit / CRORE_FACTOR
+success_cr = total_success / CRORE_FACTOR
+pending_cr = total_pending / CRORE_FACTOR
+reinitiated_cr = total_reinitiated / CRORE_FACTOR
+balance_cr = total_balance / CRORE_FACTOR
+
+
+# KPI Header - Now using 6 columns (Total Limit, Success, Success Rate, Pending, Re-Initiated, Balance)
 col1, col2, col3, col4, col5, col6 = st.columns(6) 
 
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
 
-col1.metric("Total Budget Assigned (M)", f"{CURRENCY}{total_limit:,.2f}")
-col2.metric("Total Success (M)", f"{CURRENCY}{total_success:,.2f}", delta_color="normal")
+col1.metric(f"Total Budget Assigned ({CURRENCY_LABEL})", f"₹{limit_cr:,.2f}")
+col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta_color="normal")
 col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
-# NEW METRICS ADDED
-col4.metric("Total Pending (M)", f"{CURRENCY}{total_pending:,.2f}")
-col5.metric("Total Re-Initiated (M)", f"{CURRENCY}{total_reinitiated:,.2f}")
-col6.metric("Total Balance (M)", f"{CURRENCY}{total_balance:,.2f}")
+col4.metric(f"Total Pending ({CURRENCY_LABEL})", f"₹{pending_cr:,.2f}")
+col5.metric(f"Total Re-Initiated ({CURRENCY_LABEL})", f"₹{reinitiated_cr:,.2f}")
+col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
 
 
 # --- Main Visualizations ---
@@ -171,7 +184,10 @@ with col_vis1:
     st.subheader("📊 Expenditure Breakdown by Category Status")
     # Group and ensure no NaN columns before sum
     category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum()
-    st.bar_chart(category_summary)
+    # Apply scaling for the chart data
+    category_summary_cr = category_summary / CRORE_FACTOR
+    category_summary_cr.columns = [f'Success ({CURRENCY_LABEL})', f'Pending ({CURRENCY_LABEL})', f'Re-Initiated ({CURRENCY_LABEL})']
+    st.bar_chart(category_summary_cr)
 
 # Visualization 2: Top 10 States by Limit
 with col_vis2:
@@ -180,8 +196,10 @@ with col_vis2:
     # Check if a state filter is applied before showing Top 10 states
     if selected_state == 'All States':
         state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
+        # Apply scaling for the chart data
+        state_summary['child_expenditure_limit_assigned'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
         state_summary = state_summary.set_index('state')
-        st.bar_chart(state_summary)
+        st.bar_chart(state_summary, y='child_expenditure_limit_assigned') # Explicitly use the scaled column
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
 
@@ -189,4 +207,10 @@ with col_vis2:
 # --- Detailed Data Table ---
 st.divider()
 st.subheader("📋 Raw Data View")
-st.dataframe(df_filtered)
+# Display data frame with scaled monetary columns for consistency (optional, but good practice)
+df_display = df_filtered.copy()
+for col in numeric_cols:
+    df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
+    df_display = df_display.drop(columns=[col])
+
+st.dataframe(df_display)
