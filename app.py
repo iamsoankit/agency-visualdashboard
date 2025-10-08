@@ -18,7 +18,6 @@ def load_data(file_path):
         return pd.DataFrame()
     
     # Try common encodings and include error handling for bad lines
-    # FIX: engine='python' is added to handle complex parsing issues like buffer overflow
     for encoding in ['utf-8', 'latin-1', 'cp1252']:
         try:
             # Attempt to read the CSV using the more flexible Python engine
@@ -31,7 +30,7 @@ def load_data(file_path):
         except UnicodeDecodeError:
             continue
         except Exception as e:
-            # If a complex error occurs (like the Buffer overflow), log it and continue trying other encodings
+            # If a complex error occurs, log it and continue trying other encodings
             st.warning(f"Failed to read with {encoding} and Python engine. Trying next encoding. Error: {e}")
             continue
     
@@ -43,6 +42,9 @@ df = load_data(DATA_FILE)
 
 if df.empty:
     st.stop() # Stop the script if data failed to load
+
+# --- FIX for KeyError: Strip whitespace from all column names ---
+df.columns = df.columns.str.strip()
 
 # Ensure numeric columns are actually numeric after loading
 numeric_cols = ['Child Expenditure Limit Assigned', 'Success', 'Pending', 'Re-Initiated', 'Balance']
