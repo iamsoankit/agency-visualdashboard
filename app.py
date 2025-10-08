@@ -6,12 +6,19 @@ import os
 # NOTE: Ensure this CSV file is uploaded to the same directory as app.py
 DATA_FILE = "Book3.xlsx - MAIN DATA 07.10.25.csv"
 
+# Define the expected, clean column names corresponding to the original 11 columns
+CLEAN_COLUMN_NAMES = [
+    'sr_no', 'agency_name', 'unique_id', 'state', 'agency_type', 
+    'category', 'child_expenditure_limit_assigned', 'success', 
+    'pending', 're_initiated', 'balance'
+]
+
 # Function to load data safely and efficiently
 @st.cache_data
 def load_data(file_path):
     """
-    Loads and caches data from the CSV file, trying different encodings 
-    and the Python engine to handle file structure and encoding errors.
+    Loads and caches data from the CSV file, skipping the original header
+    and applying clean column names to prevent KeyError.
     """
     if not os.path.exists(file_path):
         st.error(f"Data file not found: {file_path}. Please ensure it is in the same directory.")
@@ -20,18 +27,39 @@ def load_data(file_path):
     # Try common encodings and include error handling for bad lines
     for encoding in ['utf-8', 'latin-1', 'cp1252']:
         try:
-            # Attempt to read the CSV using the more flexible Python engine
-            df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip', engine='python')
+            # FIX: Skip the malformed header (header=None), use Python engine for stability,
+            # and use the clean column names defined above.
+            df = pd.read_csv(
+                file_path, 
+                encoding=encoding, 
+                on_bad_lines='skip', 
+                engine='python',
+                header=0 # Read the first row as header temporarily
+            )
+            
+            # --- Aggressive Header Replacement ---
+            # Reload, skipping the header row, and manually assigning clean names
+            df = pd.read_csv(
+                file_path, 
+                encoding=encoding, 
+                on_bad_lines='skip', 
+                engine='python',
+                header=None,  # Skip header row
+                names=CLEAN_COLUMN_NAMES # Assign clean names
+            )
+
+            # Drop the first row (the actual malformed header) after assignment
+            df = df.iloc[1:].copy()
             
             # --- Optional Logging for Debugging ---
-            st.success(f"Data loaded successfully using {encoding} encoding and Python engine. (Some bad lines may have been skipped)")
+            st.success(f"Data loaded successfully using {encoding} encoding and explicit header assignment. (Malformed header row skipped)")
             
             return df
         except UnicodeDecodeError:
             continue
         except Exception as e:
             # If a complex error occurs, log it and continue trying other encodings
-            st.warning(f"Failed to read with {encoding} and Python engine. Trying next encoding. Error: {e}")
+            st.warning(f"Failed to read with {encoding} and header fix. Trying next encoding. Error: {e}")
             continue
     
     st.error("Failed to read CSV with all common encodings and the Python engine. Please check the file's encoding or structure.")
@@ -43,25 +71,13 @@ df = load_data(DATA_FILE)
 if df.empty:
     st.stop() # Stop the script if data failed to load
 
-# --- FIX for KeyError: AGGRESSIVE COLUMN CLEANING ---
-# 1. Strip all leading/trailing whitespace
-df.columns = df.columns.str.strip()
-
-# 2. Convert to lowercase and replace spaces/special characters with underscores
-# This ensures we have clean, consistent column names regardless of hidden characters.
-df.columns = df.columns.str.lower().str.replace(' ', '_', regex=False).str.replace(r'[^\w]+', '', regex=True)
-
-# Update the list of expected column names to the new, clean format
+# The column names are now guaranteed to be clean, so we remove the redundant cleaning step.
+# The numeric columns are already defined based on the fixed list.
 numeric_cols = ['child_expenditure_limit_assigned', 'success', 'pending', 're_initiated', 'balance']
 
 # Ensure numeric columns are actually numeric after loading
 for col in numeric_cols:
-    # Check if the cleaned column name exists before trying to access it
-    if col not in df.columns:
-        st.error(f"Critical Error: Required column '{col}' not found after cleaning header. The original header name might be severely malformed.")
-        st.dataframe(df.columns.tolist())
-        st.stop()
-        
+    # We no longer need the error check because the names are fixed.
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) # 'coerce' turns non-numeric text into NaN, then fill NaN with 0
 
 # --- Sidebar Filters ---
