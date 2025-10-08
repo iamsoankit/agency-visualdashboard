@@ -7,13 +7,13 @@ import requests # Need this for fetching data from a URL
 # Google Sheet ID extracted from your URL: 
 # https://docs.google.com/spreadsheets/d/1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo/edit?gid=1933215839#gid=1933215839
 SHEET_ID = '1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo'
-# The gid is for the specific sheet tab within the file (MAIN DATA 07.10.25)
+# The gid (internal sheet ID) is for the specific sheet tab within the file (MAIN DATA 07.10.25)
 GID = '1933215839' 
 
 # Construct the public CSV export URL for the specific sheet tab
 DATA_URL = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}'
 
-# Define the expected, clean column names (same as before)
+# Define the expected, clean column names (based on the provided spreadsheet structure)
 CLEAN_COLUMN_NAMES = [
     'sr_no', 'agency_name', 'unique_id', 'state', 'agency_type', 
     'category', 'child_expenditure_limit_assigned', 'success', 
@@ -24,12 +24,11 @@ CLEAN_COLUMN_NAMES = [
 @st.cache_data(ttl=60) # Cache for 60 seconds to enable "real-time" feel
 def load_data(url):
     """
-    Loads data directly from the Google Sheet CSV export URL.
-    This bypasses local file issues and is more reliable for live data.
+    Loads data directly from the public Google Sheet CSV export URL.
+    This is the most reliable method for live data access in Streamlit.
     """
     try:
         # Use pandas read_csv directly on the URL
-        # We assume the data starts immediately (no malformed header)
         df = pd.read_csv(
             url, 
             header=None, # Skip the default header row
@@ -37,16 +36,24 @@ def load_data(url):
             skiprows=1 # Skip the actual header row from the sheet
         )
         
-        # Check if the data fetch was successful but returned an error page (common issue)
-        if len(df.columns) != len(CLEAN_COLUMN_NAMES):
-            st.error("Data loading failed. Check if the Google Sheet link is public and the GID is correct.")
+        # Basic check to ensure a valid dataset was returned
+        if len(df.columns) != len(CLEAN_COLUMN_NAMES) or df.empty:
+            st.error("Data loading failed. Please ensure the Google Sheet link is public, the GID is correct, and the sheet contains data.")
             return pd.DataFrame()
 
         st.success("Data loaded successfully from Google Sheet URL.")
         return df
 
     except Exception as e:
-        st.error(f"Failed to fetch data from Google Sheet URL. Error: {e}")
+        # Handling for unauthorized access (401) and general errors
+        if "401" in str(e) or "Unauthorized" in str(e) or "403" in str(e):
+            st.error(
+                "Failed to fetch data: Unauthorized Error.\n\n"
+                "Please ensure the Google Sheet is set to 'Anyone with the link' (Viewer access) "
+                "in its sharing settings."
+            )
+        else:
+            st.error(f"Failed to fetch data from Google Sheet URL. Please check your URL and network connection. Error: {e}")
         return pd.DataFrame()
 
 # --- Load Data and Handle Failure ---
@@ -60,9 +67,9 @@ numeric_cols = ['child_expenditure_limit_assigned', 'success', 'pending', 're_in
 
 # Ensure numeric columns are actually numeric after loading
 for col in numeric_cols:
-    # Handle the fact that non-English languages/locales sometimes use commas (,) for decimal separators.
-    # We will use regex to clean up potential non-numeric characters before conversion.
-    # This addresses the "data entry is in different language" issue for numbers.
+    # IMPORTANT: The str.replace(r'[^\d.]', '', regex=True) line cleans out
+    # foreign characters, commas (if used as thousand separators), and non-numeric
+    # symbols, retaining only digits and periods (decimals). This is crucial for non-English locales.
     df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) 
 
@@ -70,9 +77,10 @@ for col in numeric_cols:
 st.sidebar.header("Filter Data")
 
 # Filter 1: State Selection (Using cleaned 'state' column)
+# Using str.upper() to ensure consistent filtering if state names have mixed cases
 selected_state = st.sidebar.selectbox(
     "Select State:",
-    options=['All States'] + sorted(df['state'].astype(str).unique().tolist())
+    options=['All States'] + sorted(df['state'].astype(str).str.upper().unique().tolist())
 )
 
 # Filter 2: Category Selection (Using cleaned 'category' column)
@@ -85,7 +93,8 @@ selected_category = st.sidebar.selectbox(
 df_filtered = df.copy()
 
 if selected_state != 'All States':
-    df_filtered = df_filtered[df_filtered['state'] == selected_state]
+    # Filter the DataFrame based on the normalized state name
+    df_filtered = df_filtered[df_filtered['state'].astype(str).str.upper() == selected_state]
 
 if selected_category != 'All Categories':
     df_filtered = df_filtered[df_filtered['category'] == selected_category]
@@ -109,6 +118,7 @@ st.divider()
 
 # KPI Header
 col1, col2, col3, col4 = st.columns(4)
+# Displaying values in Millions (M) for better readability
 col1.metric("Total Budget Assigned (M)", f"${total_limit:,.2f}")
 col2.metric("Total Success (M)", f"${total_success:,.2f}", delta_color="normal")
 col3.metric("Total Pending (M)", f"${total_pending:,.2f}")
