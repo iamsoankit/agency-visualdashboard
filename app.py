@@ -153,8 +153,8 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="💰 Agency Expenditure Dashboard")
-st.title("💸 Agency Expenditure Dashboard (Live Data)")
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="💖 Agency Expenditure Dashboard") # Updated emoji
+st.title("💖 Agency Expenditure Dashboard (Live Data)") # Updated emoji
 
 # Get the list of unique states in the filtered data for display
 filtered_states = df_filtered['state'].astype(str).unique().tolist()
@@ -193,8 +193,9 @@ col1, col2, col3, col4, col5, col6 = st.columns(6)
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
 
 col1.metric(f"Total Budget Assigned ({CURRENCY_LABEL})", f"₹{limit_cr:,.2f}")
-col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta_color="normal")
-col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
+# KPI colors can't be set directly, but deltas react to values.
+col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta_color="normal") 
+col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse") # "inverse" makes positive good, negative bad
 col4.metric(f"Total Pending ({CURRENCY_LABEL})", f"₹{pending_cr:,.2f}")
 col5.metric(f"Total Re-Initiated ({CURRENCY_LABEL})", f"₹{reinitiated_cr:,.2f}")
 col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
@@ -214,16 +215,17 @@ with col_vis1:
     # Apply scaling for the chart data
     category_summary_cr = category_summary / CRORE_FACTOR
     
-    # --- AESTHETIC CHANGE 1: Use a cleaner, distinct color palette for the stacked bar chart ---
-    # Prepare data for cleaner charting
+    # --- AESTHETIC CHANGE 1: Pink Gradient Palette ---
     category_summary_cr.columns = ['Success', 'Pending', 'Re-Initiated']
     
-    # Streamlit's simple bar_chart requires data to be structured for plotting. 
-    # To enforce specific colors, we can map the column names to a simple list of hex colors.
-    # Color Choices: Success (Green), Pending (Yellow/Orange), Re-Initiated (Blue/Gray)
+    # Define a pink/purple gradient palette
+    pink_gradient_colors = ["#FFC0CB", "#EE82EE", "#DA70D6"] # Light Pink, Violet, Orchid
+    # You might want to adjust the order or specific shades for the exact gradient feel.
+    # For a smoother gradient, ensure these colors progress visually.
+    
     st.bar_chart(
         category_summary_cr, 
-        color=["#4BBF65", "#FFC72C", "#5D9BFF"] # Green, Yellow, Blue/Gray
+        color=pink_gradient_colors # Apply the pink gradient colors
     )
 
 
@@ -237,11 +239,11 @@ with col_vis2:
         # Apply scaling for the chart data
         state_summary['Limit Assigned (Cr)'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
         state_summary = state_summary.set_index('state')
-        # --- AESTHETIC CHANGE 2: Use a consistent, appealing color for the bar chart ---
+        # --- AESTHETIC CHANGE 2: Single prominent pink shade for the bar chart ---
         st.bar_chart(
             state_summary, 
             y='Limit Assigned (Cr)',
-            color="#5D9BFF" # Use a single, appealing blue color
+            color="#FF69B4" # A vibrant hot pink
         )
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
