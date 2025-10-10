@@ -136,14 +136,16 @@ if selected_agency != 'All Agencies':
 if selected_unique_id != 'All Codes':
     df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
-# Add instruction for theme switching in the sidebar (NEW)
-st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
+# Add instruction for theme switching in the sidebar (AESTHETIC IMPROVEMENT)
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Aesthetic Tip:** For a quick look change, use the 'Settings' menu (☰ top right) to switch between **Light, Dark, and High Contrast** themes!")
+
 
 # --- 2. Calculate KPIs on Filtered Data ---
 total_limit = df_filtered['child_expenditure_limit_assigned'].sum()
 total_success = df_filtered['success'].sum()
 total_pending = df_filtered['pending'].sum()
-total_reinitiated = df_filtered['re_initiated'].sum() # NEW CALCULATION
+total_reinitiated = df_filtered['re_initiated'].sum() 
 total_balance = df_filtered['balance'].sum()
 
 # Safe calculation for success rate
@@ -151,9 +153,8 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
 # --- 3. Dashboard Layout ---
-# Removed confusing theme comments, relying on native Streamlit theme selection
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
-st.title("💰 Agency Expenditure Dashboard (Live Data)")
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="💰 Agency Expenditure Dashboard")
+st.title("💸 Agency Expenditure Dashboard (Live Data)")
 
 # Get the list of unique states in the filtered data for display
 filtered_states = df_filtered['state'].astype(str).unique().tolist()
@@ -169,7 +170,7 @@ else:
     
 # Updated Markdown to show the State name(s) clearly
 st.markdown(f"""
-    **Data displayed for:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Auto-refreshes every 60 seconds.*
+    **🔍 Current View:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Refreshes every 60 seconds.*
 """)
 st.divider()
 
@@ -186,7 +187,7 @@ reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
 
-# KPI Header - Now using 6 columns (Total Limit, Success, Success Rate, Pending, Re-Initiated, Balance)
+# KPI Header - Now using 6 columns 
 col1, col2, col3, col4, col5, col6 = st.columns(6) 
 
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
@@ -200,6 +201,8 @@ col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
 
 
 # --- Main Visualizations ---
+st.markdown("---") # Aesthetic divider for visuals
+st.header("Visual Analytics")
 
 col_vis1, col_vis2 = st.columns(2)
 
@@ -210,8 +213,19 @@ with col_vis1:
     category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum()
     # Apply scaling for the chart data
     category_summary_cr = category_summary / CRORE_FACTOR
-    category_summary_cr.columns = [f'Success ({CURRENCY_LABEL})', f'Pending ({CURRENCY_LABEL})', f'Re-Initiated ({CURRENCY_LABEL})']
-    st.bar_chart(category_summary_cr)
+    
+    # --- AESTHETIC CHANGE 1: Use a cleaner, distinct color palette for the stacked bar chart ---
+    # Prepare data for cleaner charting
+    category_summary_cr.columns = ['Success', 'Pending', 'Re-Initiated']
+    
+    # Streamlit's simple bar_chart requires data to be structured for plotting. 
+    # To enforce specific colors, we can map the column names to a simple list of hex colors.
+    # Color Choices: Success (Green), Pending (Yellow/Orange), Re-Initiated (Blue/Gray)
+    st.bar_chart(
+        category_summary_cr, 
+        color=["#4BBF65", "#FFC72C", "#5D9BFF"] # Green, Yellow, Blue/Gray
+    )
+
 
 # Visualization 2: Top 10 States by Limit
 with col_vis2:
@@ -221,15 +235,20 @@ with col_vis2:
     if selected_state == 'All States':
         state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
         # Apply scaling for the chart data
-        state_summary['child_expenditure_limit_assigned'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
+        state_summary['Limit Assigned (Cr)'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
         state_summary = state_summary.set_index('state')
-        st.bar_chart(state_summary, y='child_expenditure_limit_assigned') # Explicitly use the scaled column
+        # --- AESTHETIC CHANGE 2: Use a consistent, appealing color for the bar chart ---
+        st.bar_chart(
+            state_summary, 
+            y='Limit Assigned (Cr)',
+            color="#5D9BFF" # Use a single, appealing blue color
+        )
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
 
 
 # --- Detailed Data Table ---
-st.divider()
+st.markdown("---")
 st.subheader("📋 Raw Data View")
 # Display data frame with scaled monetary columns for consistency (optional, but good practice)
 df_display = df_filtered.copy()
@@ -237,4 +256,4 @@ for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-st.dataframe(df_display)
+st.dataframe(df_display, use_container_width=True)
