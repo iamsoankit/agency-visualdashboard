@@ -204,9 +204,9 @@ col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
 
 col_vis1, col_vis2 = st.columns(2)
 
-# Visualization 1: Expenditure Status by Category
+# Visualization 1: Expenditure Status by Category (ENHANCED PLOTLY CHART)
 with col_vis1:
-    st.subheader("📊 Expenditure Breakdown by Category Status")
+    st.subheader("✅ Status Breakdown by Category")
     
     # --- Prepare Data for Plotly (Must reset index to get 'category' as a column) ---
     category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
@@ -215,21 +215,39 @@ with col_vis1:
     category_summary['pending'] /= CRORE_FACTOR
     category_summary['re_initiated'] /= CRORE_FACTOR
     
-    # Define the requested color mapping
-    COLOR_MAP = {'success': '#2ca02c', 'pending': '#ff7f0e', 're_initiated': '#1f77b4'} # Green, Orange, Blue
+    # Define the professional color mapping: Success (Green), Pending (Orange), Re-Initiated (Blue)
+    COLOR_MAP = {'success': '#2ca02c', 'pending': '#ff7f0e', 're_initiated': '#1f77b4'} 
     
     fig1 = px.bar(
         category_summary,
         x='category',
         y=['success', 'pending', 're_initiated'],
-        labels={'value': f'Amount ({CURRENCY_LABEL})', 'category': 'Agency Category', 'variable': 'Status'},
-        title=f"Expenditure Status by Category ({CURRENCY_LABEL})",
+        # --- ENHANCED PLOTLY SETTINGS ---
+        labels={
+            'value': f'Amount ({CURRENCY_LABEL})', 
+            'category': 'Agency Category', 
+            'variable': 'Expenditure Status'
+        },
+        title=f"Expenditure Status by Category",
         color_discrete_map=COLOR_MAP,
-        template="plotly_white" # Use a clean template
+        template="plotly_white",
+        hover_data={
+            'category': True,
+            'success': ':.2f',
+            'pending': ':.2f',
+            're_initiated': ':.2f'
+        } # Custom hover data format
     )
     
-    # Make chart stack and readable
-    fig1.update_layout(barmode='relative', height=450, legend_title_text='Status')
+    # Stack the bars and refine the layout
+    fig1.update_layout(
+        barmode='relative', 
+        height=450, 
+        legend_title_text='Status',
+        xaxis={'categoryorder':'total descending', 'title': 'Category'}, # Order categories by total expenditure
+        yaxis={'title': f'Amount ({CURRENCY_LABEL})'}
+    )
+    fig1.update_traces(marker_line_width=0) # Remove line borders for a cleaner look
     
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -272,4 +290,4 @@ for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-st.dataframe(df_display, use_container_width=True)
+st.dataframe(df_display, use_container
