@@ -212,7 +212,16 @@ reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
 # Determine color/delta cues for metrics
-success_rate_delta = "Excellent" (f"+{success_rate:,.2f}%") if success_rate > 80 else ("Good" if success_rate > 50 else ("Needs Review" if success_rate < 30 else "Moderate"))
+# FIX: Correctly concatenate string and f-string expression
+if success_rate > 80:
+    success_rate_delta = f"Excellent (+{success_rate:,.2f}%)"
+elif success_rate > 50:
+    success_rate_delta = "Good"
+elif success_rate < 30:
+    success_rate_delta = "Needs Review"
+else:
+    success_rate_delta = "Moderate"
+
 delta_color = "inverse" if success_rate < 30 else "normal" 
 
 # KPI Header - 6 prominent columns
@@ -220,7 +229,7 @@ col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
 col1.metric(f"Total Budget Assigned ({CURRENCY_LABEL})", f"₹{limit_cr:,.2f}")
-col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta=f"{success_rate_delta}", delta_color=delta_color)
+col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta=success_rate_delta, delta_color=delta_color)
 col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color=delta_color)
 col4.metric(f"Total Pending ({CURRENCY_LABEL})", f"₹{pending_cr:,.2f}")
 col5.metric(f"Total Re-Initiated ({CURRENCY_LABEL})", f"₹{reinitiated_cr:,.2f}")
