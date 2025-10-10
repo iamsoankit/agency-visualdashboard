@@ -21,6 +21,13 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
+# Currency and Scaling Constants
+CRORE_FACTOR = 10 
+CURRENCY_LABEL = "INR (Cr)" 
+
+# Define the Plotly colors (Green, Orange, Blue) as requested
+COLOR_MAP = {'success': '#2ca02c', 'pending': '#ff7f0e', 're_initiated': '#1f77b4'} 
+
 # Function to load data safely and efficiently
 @st.cache_data(ttl=60) # Cache for 60 seconds to enable "real-time" feel
 def load_data(url):
@@ -110,7 +117,7 @@ selected_agency = st.sidebar.selectbox(
 # DataFrame filtered by State, Category, and Agency Name
 df_for_unique_code_selection = df_for_agency_selection.copy()
 if selected_agency != 'All Agencies':
-    df_for_unique_code_selection = df_for_unique_code_selection[df_for_unique_code_selection['agency_name'] == selected_agency]
+    df_for_unique_code_selection = df_for_unique_code_selection[df_for_agency_selection['agency_name'] == selected_agency]
 
 # 4. Unique ID Selection (Depends on State, Category, and Agency Name)
 selected_unique_id = st.sidebar.selectbox(
@@ -120,8 +127,7 @@ selected_unique_id = st.sidebar.selectbox(
 # --- End Cascading Filters ---
 
 
-# Apply Filters (This block now ensures all 4 selections filter the data,
-# but the available options in 2, 3, and 4 are constrained by earlier selections.)
+# Apply Filters (Final filtering based on all selections)
 df_filtered = df.copy()
 
 if selected_state != 'All States':
@@ -136,7 +142,7 @@ if selected_agency != 'All Agencies':
 if selected_unique_id != 'All Codes':
     df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
-# Add instruction for theme switching in the sidebar (NEW)
+# Add instruction for theme switching in the sidebar 
 st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
 
 
@@ -175,10 +181,6 @@ st.divider()
 
 
 # --- SCALING AND CURRENCY ---
-# To display amounts in Crores (Cr), we divide the sums by 10.
-CRORE_FACTOR = 10 
-CURRENCY_LABEL = "INR (Cr)" 
-
 # Scale the KPIs to Crores
 limit_cr = total_limit / CRORE_FACTOR
 success_cr = total_success / CRORE_FACTOR
@@ -204,34 +206,65 @@ col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
 
 col_vis1, col_vis2 = st.columns(2)
 
-# Visualization 1: Expenditure Status by Category
+# Visualization 1: Expenditure Status by Category (ENHANCED PLOTLY CHART)
 with col_vis1:
-    st.subheader("📊 Expenditure Breakdown by Category Status")
+    st.subheader("✅ Status Breakdown by Category")
     
-    # --- Prepare Data for Plotly (Must reset index to get 'category' as a column) ---
-    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
-    # Scale the numeric columns
-    category_summary['success'] /= CRORE_FACTOR
-    category_summary['pending'] /= CRORE_FACTOR
-    category_summary['re_initiated'] /= CRORE_FACTOR
-    
-    # Define the requested color mapping
-    COLOR_MAP = {'success': '#2ca02c', 'pending': '#ff7f0e', 're_initiated': '#1f77b4'} # Green, Orange, Blue
-    
-    fig1 = px.bar(
-        category_summary,
-        x='category',
-        y=['success', 'pending', 're_initiated'],
-        labels={'value': f'Amount ({CURRENCY_LABEL})', 'category': 'Agency Category', 'variable': 'Status'},
-        title=f"Expenditure Status by Category ({CURRENCY_LABEL})",
-        color_discrete_map=COLOR_MAP,
-        template="plotly_white" # Use a clean template
-    )
-    
-    # Make chart stack and readable
-    fig1.update_layout(barmode='relative', height=450, legend_title_text='Status')
-    
-    st.plotly_chart(fig1, use_container_width=True)
+    if not df_filtered.empty:
+        # Prepare Data for Plotly (Must reset index to get 'category' as a column)
+        category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
+        
+        # Scale the numeric columns
+        category_summary['success'] /= CRORE_FACTOR
+        category_summary['pending'] /= CRORE_FACTOR
+        category_summary['re_initiated'] /= CRORE_FACTOR
+
+        # Create Plotly Chart
+        fig1 = px.bar(
+            category_summary,
+            x='category',
+            y=['success', 'pending', 're_initiated'],
+            labels={
+                'value': f'Amount ({CURRENCY_LABEL})', 
+                'category': 'Agency Category', 
+                'variable': 'Expenditure Status'
+            },
+            title=f"Expenditure Status by Category",
+            color_discrete_map=COLOR_MAP,
+            template="plotly_white",
+            hover_data={
+                'category': True,
+                'success': ':.2f',
+                'pending': ':.2f',
+                're_initiated': ':.2f'
+            } # Custom hover data format
+        )
+        
+        # Stack the bars and refine the layout
+        fig1.update_layout(
+            barmode='relative', 
+            height=450, 
+            legend_title_text='Status',
+            # --- FONT ENHANCEMENTS START ---
+            title_font=dict(size=20, weight='bold'),
+            legend_font=dict(size=12, family="Arial"),
+            # Order categories by total expenditure and bold axis titles
+            xaxis=dict(
+                categoryorder='total descending', 
+                title=dict(text='Category', font=dict(size=14, weight='bold')),
+                tickfont=dict(size=12)
+            ), 
+            yaxis=dict(
+                title=dict(text=f'Amount ({CURRENCY_LABEL})', font=dict(size=14, weight='bold')),
+                tickfont=dict(size=12)
+            )
+            # --- FONT ENHANCEMENTS END ---
+        )
+        fig1.update_traces(marker_line_width=0) # Remove line borders for a cleaner look
+        
+        st.plotly_chart(fig1, use_container_width=True)
+    else:
+        st.info("No data available for the selected filters to display the Category Breakdown.")
 
 
 # Visualization 2: Top 10 States by Limit
@@ -244,7 +277,7 @@ with col_vis2:
         # Apply scaling for the chart data
         state_summary['Limit Assigned (Cr)'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
         
-        # --- Create Plotly Chart for Top 10 States with a Sequential Gradient (Plasma) ---
+        # Create Plotly Chart for Top 10 States with a Sequential Gradient (Plasma)
         fig2 = px.bar(
             state_summary,
             x='Limit Assigned (Cr)',
@@ -254,10 +287,26 @@ with col_vis2:
             labels={'Limit Assigned (Cr)': f'Total Limit ({CURRENCY_LABEL})', 'state': 'State'},
             template="plotly_white",
             color='Limit Assigned (Cr)', # Color based on the value itself
-            color_continuous_scale=px.colors.sequential.Plasma # The gradient used in the shared code
+            color_continuous_scale=px.colors.sequential.Plasma 
         )
         
-        fig2.update_layout(height=450, yaxis={'categoryorder':'total ascending'}, coloraxis_showscale=False)
+        # Set category order and hide the side color scale for cleanliness
+        fig2.update_layout(
+            height=450, 
+            coloraxis_showscale=False,
+            # --- FONT ENHANCEMENTS START ---
+            title_font=dict(size=20, weight='bold'),
+            yaxis=dict(
+                categoryorder='total ascending',
+                title=dict(text='State', font=dict(size=14, weight='bold')),
+                tickfont=dict(size=12)
+            ),
+            xaxis=dict(
+                title=dict(text=f'Total Limit ({CURRENCY_LABEL})', font=dict(size=14, weight='bold')),
+                tickfont=dict(size=12)
+            )
+            # --- FONT ENHANCEMENTS END ---
+        )
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
@@ -269,7 +318,8 @@ st.subheader("📋 Raw Data View")
 # Display data frame with scaled monetary columns for consistency (optional, but good practice)
 df_display = df_filtered.copy()
 for col in numeric_cols:
-    df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
+    # Rename and scale the columns for the final display table
+    df_display[f'{col.replace("_", " ").title()} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
 st.dataframe(df_display, use_container_width=True)
