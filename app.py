@@ -16,10 +16,17 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
-# --- Custom CSS for UI/Aesthetics (Significantly Enhanced) ---
+# --- Custom CSS for UI/Aesthetics (Enhanced with Animations) ---
 st.markdown(
     """
     <style>
+    /* 1. ANIMATION KEYFRAMES */
+    @keyframes subtle-float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-3px); } /* Slight upward movement */
+        100% { transform: translateY(0px); }
+    }
+
     /* Global Font/Body cleanup */
     .stApp {
         background-color: var(--body-background-color);
@@ -36,23 +43,25 @@ st.markdown(
     /* Custom styling for metrics (KPI cards) - Neutral background, clear border */
     [data-testid="stMetric"] {
         padding: 15px 15px;
-        border-radius: 12px; /* Rounded corners */
+        border-radius: 12px; 
         border: 1px solid var(--border-color); 
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); 
         margin-bottom: 15px;
         background-color: var(--secondary-background-color);
-        transition: transform 0.2s; /* Hover effect */
+        transition: transform 0.2s, box-shadow 0.2s; /* Faster transition for better feel */
     }
     [data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
+        transform: translateY(-4px); /* Increased lift on hover */
+        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1); /* Deeper shadow on hover */
     }
 
-    /* Change the main header font/style */
+    /* Change the main header font/style AND add float animation */
     h1 {
         font-size: 2.5rem;
         color: #1f77b4; 
         font-weight: 700;
         margin-bottom: 5px;
+        animation: subtle-float 5s ease-in-out infinite; /* Slow, gentle float */
     }
     
     /* Style for Visualization Containers (Chart "Cards") */
@@ -63,6 +72,11 @@ st.markdown(
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         background-color: var(--secondary-background-color);
+        transition: transform 0.2s, box-shadow 0.2s; /* Added transition */
+    }
+    .chart-container:hover {
+        transform: translateY(-2px); /* Slight lift on hover */
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
     }
     
     /* Remove default Streamlit padding at the top */
@@ -212,7 +226,6 @@ reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
 # Determine color/delta cues for metrics
-# FIX: Correctly concatenate string and f-string expression
 if success_rate > 80:
     success_rate_delta = f"Excellent (+{success_rate:,.2f}%)"
 elif success_rate > 50:
