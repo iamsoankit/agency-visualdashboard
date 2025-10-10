@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import requests 
 import plotly.express as px
+import json # NEW: Import for handling API payload
 
 # --- Configuration ---
 # Google Sheet ID extracted from your URL: 
@@ -16,10 +17,16 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
-# --- LOGO URLS (PLACEHOLDERS - REPLACE THESE WITH YOUR STABLE LINKS) ---
-# NOTE: Replace these URLs with stable, public links to your DST and MoST logos.
-LOGO_URL_DST = "https://i.imgur.com/example/dst_logo.png" 
-LOGO_URL_MOST = "https://i.imgur.com/example/most_logo.png" 
+# --- LOGO URLS (CRITICAL: REPLACE THESE WITH YOUR STABLE LINKS) ---
+# NOTE: This is a working placeholder image. Please replace it with your DST logo link.
+LOGO_URL_DST = "https://upload.wikimedia.org/wikipedia/commons/f/fa/Seal_of_India.png" 
+LOGO_URL_MOST = "https://upload.wikimedia.org/wikipedia/commons/f/fa/Seal_of_India.png" 
+
+# --- AI Configuration ---
+# Placeholder for API Key (will be provided by the environment at runtime)
+API_KEY = "" 
+GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={API_KEY}"
 
 # --- Custom CSS for UI/Aesthetics (Enhanced with Animations) ---
 st.markdown(
@@ -96,6 +103,15 @@ st.markdown(
         margin-left: auto;
         margin-right: auto;
     }
+    /* Styling for AI Summary Box */
+    .ai-summary-box {
+        padding: 20px;
+        border-radius: 10px;
+        background-color: var(--secondary-background-color);
+        border-left: 5px solid #1f77b4; /* Blue accent line */
+        margin-top: 15px;
+        font-style: italic;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -131,6 +147,55 @@ def load_data(url):
             st.error(f"Failed to fetch data from Google Sheet URL. Error: {e}")
         return pd.DataFrame()
 
+# --- AI Summary Generation Function (NEW) ---
+def generate_summary(kpi_data, context):
+    """Calls Gemini API to generate a financial performance summary."""
+    
+    # Construct the detailed prompt
+    user_prompt = f"""
+    Act as a Senior Financial Analyst for a government agency. 
+    Analyze the following financial Key Performance Indicators (KPIs) and provide a concise, professional, single-paragraph summary of the performance. 
+    
+    Focus on utilization (Success Rate) and risk (Balance and Pending/Re-initiated funds). 
+    
+    Context: {context}
+    KPI Data (All amounts are in Indian Rupees, Crores):
+    - Total Budget Assigned: ₹{kpi_data['limit_cr']:,.2f} Cr
+    - Total Successful Expenditure: ₹{kpi_data['success_cr']:,.2f} Cr
+    - Success Rate: {kpi_data['success_rate']:,.2f}%
+    - Total Pending: ₹{kpi_data['pending_cr']:,.2f} Cr
+    - Total Re-Initiated: ₹{kpi_data['reinitiated_cr']:,.2f} Cr
+    - Total Balance (Unspent): ₹{kpi_data['balance_cr']:,.2f} Cr
+    """
+    
+    # System Instruction to guide the model's persona and output format
+    system_prompt = "You are a world-class Senior Financial Analyst. Your response must be a single, professional, concise paragraph summarizing the performance, identifying strengths and areas for attention."
+
+    payload = {
+        "contents": [{"parts": [{"text": user_prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+    }
+
+    try:
+        response = requests.post(
+            GEMINI_API_URL, 
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(payload),
+            timeout=30 # Set a reasonable timeout
+        )
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        
+        # Process the response
+        result = response.json()
+        summary_text = result['candidates'][0]['content']['parts'][0]['text']
+        return summary_text
+        
+    except requests.exceptions.RequestException as e:
+        return f"AI Analysis Failed (API Error): Please check your API key/network connection. Details: {e}"
+    except Exception as e:
+        return f"AI Analysis Failed (Processing Error): Could not parse response. Details: {e}"
+
+
 # --- Load Data and Handle Failure ---
 df = load_data(DATA_URL)
 
@@ -143,10 +208,10 @@ for col in numeric_cols:
     df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) 
 
-# --- Sidebar Filters ---
-st.sidebar.markdown("## 🔍 **FILTER EXPENDITURE DATA**") # Bolder sidebar title
+# --- Sidebar Filters (Existing Logic) ---
+st.sidebar.markdown("## 🔍 **FILTER EXPENDITURE DATA**") 
+# ... (Filter logic remains the same) ...
 
-# --- Start Cascading Filters (Logic remains the same) ---
 selected_state = st.sidebar.selectbox(
     "Select State:",
     options=['All States'] + sorted(df['state'].astype(str).str.upper().unique().tolist())
@@ -172,7 +237,7 @@ selected_agency = st.sidebar.selectbox(
 
 df_for_unique_code_selection = df_for_agency_selection.copy()
 if selected_agency != 'All Agencies':
-    df_for_unique_code_selection = df_for_unique_code_selection[df_for_agency_selection['agency_name'] == selected_agency]
+    df_for_unique_code_selection = df_for_agency_selection[df_for_agency_selection['agency_name'] == selected_agency]
 
 selected_unique_id = st.sidebar.selectbox(
     "Agency Unique Code:",
@@ -211,15 +276,12 @@ st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="
 col_logo1, col_title, col_logo2 = st.columns([1, 4, 1])
 
 with col_logo1:
-    # Display DST Logo
     st.image(LOGO_URL_DST, width=80) 
 
 with col_title:
-    # Main Title
     st.title("📊 **Financial Expenditure Dashboard: Live Performance**") 
 
 with col_logo2:
-    # Display MoST Logo
     st.image(LOGO_URL_MOST, width=80) 
     
 st.markdown("---") 
@@ -235,6 +297,8 @@ elif len(filtered_states) == 1:
     display_states = filtered_states[0]
 else:
     display_states = ", ".join(filtered_states)
+    
+current_context = f"State: {selected_state}, Category: {selected_category}, Agency: {selected_agency}, Code: {selected_unique_id}"
     
 st.markdown(f"""
     **Current Scope:** *State(s):* **{display_states}** | *Category:* **{selected_category}** | *Agency:* **{selected_agency}** | *Code:* **{selected_unique_id}** <br><small>Data updates live from the source.</small>
@@ -277,6 +341,30 @@ col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}", delta=
 
 st.markdown("---") 
 
+# --- AI SUMMARY TOOLBAR (NEW SECTION) ---
+summary_placeholder = st.empty()
+
+if st.button("✨ **Generate Financial Performance Analysis (AI)**", use_container_width=True):
+    # Pass scaled KPIs and context to the function
+    kpi_data = {
+        'limit_cr': limit_cr,
+        'success_cr': success_cr,
+        'success_rate': success_rate,
+        'pending_cr': pending_cr,
+        'reinitiated_cr': reinitiated_cr,
+        'balance_cr': balance_cr,
+    }
+    
+    with st.spinner("Analyzing data and consulting the financial model..."):
+        summary = generate_summary(kpi_data, current_context)
+    
+    # Display the result in the placeholder
+    summary_placeholder.markdown(f'<div class="ai-summary-box">**AI Financial Summary:** {summary}</div>', unsafe_allow_html=True)
+else:
+    # Initial message or clear the placeholder
+    summary_placeholder.markdown(f'<div class="ai-summary-box">Click the **Generate Performance Analysis (AI)** button above to get a dynamic financial review of the currently filtered data.</div>', unsafe_allow_html=True)
+
+st.markdown("---") 
 
 # --- Main Visualizations (Using Plotly Express) ---
 
@@ -284,7 +372,6 @@ col_vis1, col_vis2 = st.columns(2)
 
 # Visualization 1: Expenditure Status by Category (Plotly Stacked Bar)
 with col_vis1:
-    # Use the custom CSS class for the container (New visual enhancement)
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     st.subheader("✅ Status Breakdown by Agency Type")
     
@@ -312,20 +399,20 @@ with col_vis1:
         color='Status',
         title='Utilization Status Across Categories',
         labels={'category': 'Agency Type'},
-        color_discrete_map={ # Maintain appealing and consistent colors
-            f'Success ({CURRENCY_LABEL})': '#2ecc71', # Emerald Green
-            f'Pending ({CURRENCY_LABEL})': '#f1c40f', # Sunflower Yellow
-            f'Re-Initiated ({CURRENCY_LABEL})': '#3498db' # Peter River Blue
+        color_discrete_map={ 
+            f'Success ({CURRENCY_LABEL})': '#2ecc71', 
+            f'Pending ({CURRENCY_LABEL})': '#f1c40f', 
+            f'Re-Initiated ({CURRENCY_LABEL})': '#3498db' 
         },
-        template='plotly_white' # Clean theme for modern look
+        template='plotly_white' 
     )
     fig1.update_layout(xaxis_title=None, legend_title="Status", margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig1, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True) # Close custom container
+    st.markdown('</div>', unsafe_allow_html=True) 
 
 # Visualization 2: Top 10 States by Limit (Plotly Bar)
 with col_vis2:
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True) # New visual enhancement
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True) 
     st.subheader("💰 Top 10 States by Limit Assigned")
     
     if selected_state == 'All States':
@@ -341,31 +428,29 @@ with col_vis2:
             orientation='h',
             title='Top 10 States by Budget (INR Cr)',
             color='Limit (Cr)', 
-            color_continuous_scale=px.colors.sequential.Plasma, # A sleek, modern gradient scale
+            color_continuous_scale=px.colors.sequential.Plasma, 
             labels={'state': 'State'},
-            template='plotly_white' # Clean theme for modern look
+            template='plotly_white' 
         )
         fig2.update_layout(
             yaxis={'categoryorder':'total ascending'}, 
             margin=dict(t=30, b=0, l=0, r=0),
-            coloraxis_showscale=False # Hide color bar for cleaner look
+            coloraxis_showscale=False 
         )
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("Top 10 States chart is filtered only when 'All States' is selected.")
-    st.markdown('</div>', unsafe_allow_html=True) # Close custom container
+    st.markdown('</div>', unsafe_allow_html=True) 
 
 
 # --- Detailed Data Table (Using Expander) ---
 st.markdown("---")
 st.subheader("📋 Detailed Records")
 
-# Display data frame with scaled monetary columns for consistency (optional, but good practice)
 df_display = df_filtered.copy()
 for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-# Use st.expander to hide the large table initially
 with st.expander("Click here to view the full list of filtered agency records"):
     st.dataframe(df_display, use_container_width=True)
