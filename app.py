@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import requests # Need this for fetching data from a URL
-
+import plotly.express as px # Import Plotly Express
 
 # --- Configuration ---
 # Google Sheet ID extracted from your URL:
@@ -136,7 +136,7 @@ if selected_agency != 'All Agencies':
 if selected_unique_id != 'All Codes':
     df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
-# Add instruction for theme switching in the sidebar 
+# Add instruction for theme switching in the sidebar (NEW)
 st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
 
 
@@ -207,24 +207,32 @@ col_vis1, col_vis2 = st.columns(2)
 # Visualization 1: Expenditure Status by Category
 with col_vis1:
     st.subheader("📊 Expenditure Breakdown by Category Status")
-    # Group and ensure no NaN columns before sum
-    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum()
-    # Apply scaling for the chart data
-    category_summary_cr = category_summary / CRORE_FACTOR
     
-    # --- APPLYING THE REQUESTED COLOR SCHEME (Green, Orange, Blue) ---
-    category_summary_cr.columns = ['Success', 'Pending', 'Re-Initiated']
+    # --- Prepare Data for Plotly (Must reset index to get 'category' as a column) ---
+    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
+    # Scale the numeric columns
+    category_summary['success'] /= CRORE_FACTOR
+    category_summary['pending'] /= CRORE_FACTOR
+    category_summary['re_initiated'] /= CRORE_FACTOR
     
-    # Hex codes corresponding to the Plotly defaults:
-    # Green: #2ca02c (Success)
-    # Orange: #ff7f0e (Pending)
-    # Blue: #1f77b4 (Re-Initiated)
-    CHART_COLORS = ["#2ca02c", "#ff7f0e", "#1f77b4"]
+    # Define the requested color mapping
+    COLOR_MAP = {'success': '#2ca02c', 'pending': '#ff7f0e', 're_initiated': '#1f77b4'} # Green, Orange, Blue
     
-    st.bar_chart(
-        category_summary_cr,
-        color=CHART_COLORS
+    fig1 = px.bar(
+        category_summary,
+        x='category',
+        y=['success', 'pending', 're_initiated'],
+        labels={'value': f'Amount ({CURRENCY_LABEL})', 'category': 'Agency Category', 'variable': 'Status'},
+        title=f"Expenditure Status by Category ({CURRENCY_LABEL})",
+        color_discrete_map=COLOR_MAP,
+        template="plotly_white" # Use a clean template
     )
+    
+    # Make chart stack and readable
+    fig1.update_layout(barmode='relative', height=450, legend_title_text='Status')
+    
+    st.plotly_chart(fig1, use_container_width=True)
+
 
 # Visualization 2: Top 10 States by Limit
 with col_vis2:
@@ -234,15 +242,23 @@ with col_vis2:
     if selected_state == 'All States':
         state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
         # Apply scaling for the chart data
-        state_summary['child_expenditure_limit_assigned'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
-        state_summary = state_summary.set_index('state')
+        state_summary['Limit Assigned (Cr)'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
         
-        # For the Top 10 states, we'll use a single, distinct color (the Plotly default blue)
-        st.bar_chart(
-            state_summary, 
-            y='child_expenditure_limit_assigned',
-            color="#1f77b4" # Blue, same as 're_initiated' in the Plotly example
+        # --- Create Plotly Chart for Top 10 States with a Sequential Gradient (Plasma) ---
+        fig2 = px.bar(
+            state_summary,
+            x='Limit Assigned (Cr)',
+            y='state', # Use Y-axis for states (Horizontal bar chart)
+            orientation='h',
+            title=f"Top 10 States by Assigned Budget ({CURRENCY_LABEL})",
+            labels={'Limit Assigned (Cr)': f'Total Limit ({CURRENCY_LABEL})', 'state': 'State'},
+            template="plotly_white",
+            color='Limit Assigned (Cr)', # Color based on the value itself
+            color_continuous_scale=px.colors.sequential.Plasma # The gradient used in the shared code
         )
+        
+        fig2.update_layout(height=450, yaxis={'categoryorder':'total ascending'}, coloraxis_showscale=False)
+        st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("Top 10 States chart is only available when 'All States' filter is selected.")
 
@@ -256,4 +272,4 @@ for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-st.dataframe(df_display)
+st.dataframe(df_display, use_container_width=True)
