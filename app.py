@@ -16,33 +16,53 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
-# --- Custom CSS for UI/Aesthetics (UPDATED) ---
+# --- Custom CSS for UI/Aesthetics (Significantly Enhanced) ---
 st.markdown(
     """
     <style>
-    /* Bolder sidebar header */
-    .css-1d391kg, .css-1lcbmhc {
-        font-weight: 600;
-        font-size: 1.2rem;
+    /* Global Font/Body cleanup */
+    .stApp {
+        background-color: var(--body-background-color);
     }
     
-    /* Custom styling for metrics to make them stand out in both light/dark mode */
+    /* Bolder sidebar header */
+    .css-1d391kg, .css-1lcbmhc {
+        font-weight: 700;
+        font-size: 1.3rem;
+        color: var(--text-color);
+        padding-top: 0;
+    }
+    
+    /* Custom styling for metrics (KPI cards) - Neutral background, clear border */
     [data-testid="stMetric"] {
-        padding: 10px 0px;
-        /* Removed background-color: #f0f2f6; to ensure visibility in Dark Mode */
-        border-radius: 10px;
-        border: 1px solid rgba(150, 150, 150, 0.4); /* Use a subtle border for definition */
-        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.05);
-        margin-bottom: 10px;
-        background-color: var(--background-color-card); /* Optional: use Streamlit's built-in background variable */
+        padding: 15px 15px;
+        border-radius: 12px; /* Rounded corners */
+        border: 1px solid var(--border-color); 
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+        margin-bottom: 15px;
+        background-color: var(--secondary-background-color);
+        transition: transform 0.2s; /* Hover effect */
+    }
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
     }
 
     /* Change the main header font/style */
     h1 {
         font-size: 2.5rem;
-        color: #1f77b4; /* A nice blue color */
+        color: #1f77b4; 
         font-weight: 700;
-        margin-bottom: 15px;
+        margin-bottom: 5px;
+    }
+    
+    /* Style for Visualization Containers (Chart "Cards") */
+    .chart-container {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        background-color: var(--secondary-background-color);
     }
     
     /* Remove default Streamlit padding at the top */
@@ -160,7 +180,7 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 # --- 3. Dashboard Layout (Beautified) ---
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Financial Dashboard")
-st.title("📊 Financial Expenditure Dashboard: Live Performance") # Updated title
+st.title("📊 **Financial Expenditure Dashboard: Live Performance**") 
 st.markdown("---") 
 
 # Get display data for header
@@ -176,8 +196,8 @@ else:
     display_states = ", ".join(filtered_states)
     
 st.markdown(f"""
-    **Current Scope:** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** *<sub>Data updates live from the source.</sub>*
-""")
+    **Current Scope:** *State(s):* **{display_states}** | *Category:* **{selected_category}** | *Agency:* **{selected_agency}** | *Code:* **{selected_unique_id}** <br><small>Data updates live from the source.</small>
+""", unsafe_allow_html=True)
 st.markdown("---") 
 
 # --- SCALING AND CURRENCY ---
@@ -192,14 +212,13 @@ reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
 # Determine color/delta cues for metrics
-success_rate_delta = "Excellent" if success_rate > 80 else ("Good" if success_rate > 50 else ("Needs Review" if success_rate < 30 else "Moderate"))
+success_rate_delta = "Excellent" (f"+{success_rate:,.2f}%") if success_rate > 80 else ("Good" if success_rate > 50 else ("Needs Review" if success_rate < 30 else "Moderate"))
 delta_color = "inverse" if success_rate < 30 else "normal" 
 
 # KPI Header - 6 prominent columns
 col1, col2, col3, col4, col5, col6 = st.columns(6) 
 
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
-
 col1.metric(f"Total Budget Assigned ({CURRENCY_LABEL})", f"₹{limit_cr:,.2f}")
 col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta=f"{success_rate_delta}", delta_color=delta_color)
 col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color=delta_color)
@@ -216,7 +235,9 @@ col_vis1, col_vis2 = st.columns(2)
 
 # Visualization 1: Expenditure Status by Category (Plotly Stacked Bar)
 with col_vis1:
-    st.subheader("📊 Expenditure Status by Category")
+    # Use the custom CSS class for the container (New visual enhancement)
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    st.subheader("✅ Status Breakdown by Agency Type")
     
     category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
     
@@ -240,20 +261,23 @@ with col_vis1:
         x='category',
         y='Amount (Cr)',
         color='Status',
-        title='Category Status (INR Cr)',
+        title='Utilization Status Across Categories',
         labels={'category': 'Agency Type'},
-        color_discrete_map={ # Custom colors for better aesthetic
-            f'Success ({CURRENCY_LABEL})': '#27AE60', # Brighter Green
-            f'Pending ({CURRENCY_LABEL})': '#F39C12', # Orange/Yellow
-            f'Re-Initiated ({CURRENCY_LABEL})': '#3498DB' # Light Blue
-        }
+        color_discrete_map={ # Maintain appealing and consistent colors
+            f'Success ({CURRENCY_LABEL})': '#2ecc71', # Emerald Green
+            f'Pending ({CURRENCY_LABEL})': '#f1c40f', # Sunflower Yellow
+            f'Re-Initiated ({CURRENCY_LABEL})': '#3498db' # Peter River Blue
+        },
+        template='plotly_white' # Clean theme for modern look
     )
     fig1.update_layout(xaxis_title=None, legend_title="Status", margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig1, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True) # Close custom container
 
 # Visualization 2: Top 10 States by Limit (Plotly Bar)
 with col_vis2:
-    st.subheader("🗺️ Top 10 States by Limit Assigned")
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True) # New visual enhancement
+    st.subheader("💰 Top 10 States by Limit Assigned")
     
     if selected_state == 'All States':
         state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
@@ -266,15 +290,21 @@ with col_vis2:
             x='Limit (Cr)',
             y='state',
             orientation='h',
-            title='Top 10 States',
+            title='Top 10 States by Budget (INR Cr)',
             color='Limit (Cr)', 
-            color_continuous_scale=px.colors.sequential.Sunsetdark, # New attractive color scale
-            labels={'state': 'State'}
+            color_continuous_scale=px.colors.sequential.Plasma, # A sleek, modern gradient scale
+            labels={'state': 'State'},
+            template='plotly_white' # Clean theme for modern look
         )
-        fig2.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=30, b=0, l=0, r=0))
+        fig2.update_layout(
+            yaxis={'categoryorder':'total ascending'}, 
+            margin=dict(t=30, b=0, l=0, r=0),
+            coloraxis_showscale=False # Hide color bar for cleaner look
+        )
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("Top 10 States chart is filtered only when 'All States' is selected.")
+    st.markdown('</div>', unsafe_allow_html=True) # Close custom container
 
 
 # --- Detailed Data Table (Using Expander) ---
