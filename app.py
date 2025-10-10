@@ -1,19 +1,15 @@
 import streamlit as st
 import pandas as pd
 import os
-import requests # Need this for fetching data from a URL
+import requests 
+import plotly.express as px # NEW: Imported for enhanced visualization
 
 # --- Configuration ---
 # Google Sheet ID extracted from your URL: 
-# https://docs.google.com/spreadsheets/d/1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo/edit?gid=1933215839#gid=1933215839
 SHEET_ID = '1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo'
-# The gid (internal sheet ID) is for the specific sheet tab within the file (MAIN DATA 07.10.25)
 GID = '1933215839' 
-
-# Construct the public CSV export URL for the specific sheet tab
 DATA_URL = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}'
 
-# Define the expected, clean column names (based on the provided spreadsheet structure)
 CLEAN_COLUMN_NAMES = [
     'sr_no', 'agency_name', 'unique_id', 'state', 'agency_type', 
     'category', 'child_expenditure_limit_assigned', 'success', 
@@ -23,10 +19,7 @@ CLEAN_COLUMN_NAMES = [
 # Function to load data safely and efficiently
 @st.cache_data(ttl=60) # Cache for 60 seconds to enable "real-time" feel
 def load_data(url):
-    """
-    Loads data directly from the public Google Sheet CSV export URL.
-    This is the most reliable method for live data access in Streamlit.
-    """
+    """Loads data directly from the public Google Sheet CSV export URL."""
     try:
         # Use pandas read_csv directly on the URL
         df = pd.read_csv(
@@ -36,124 +29,102 @@ def load_data(url):
             skiprows=1 # Skip the actual header row from the sheet
         )
         
-        # Basic check to ensure a valid dataset was returned
         if len(df.columns) != len(CLEAN_COLUMN_NAMES) or df.empty:
-            st.error("Data loading failed. Please ensure the Google Sheet link is public, the GID is correct, and the sheet contains data.")
+            st.error("Data loading failed. Check sheet link/GID.")
             return pd.DataFrame()
 
         st.success("Data loaded successfully from Google Sheet URL.")
         return df
 
     except Exception as e:
-        # Handling for unauthorized access (401) and general errors
         if "401" in str(e) or "Unauthorized" in str(e) or "403" in str(e):
             st.error(
                 "Failed to fetch data: Unauthorized Error.\n\n"
-                "Please ensure the Google Sheet is set to 'Anyone with the link' (Viewer access) "
-                "in its sharing settings."
+                "Please ensure the Google Sheet is set to 'Anyone with the link' (Viewer access)."
             )
         else:
-            st.error(f"Failed to fetch data from Google Sheet URL. Please check your URL and network connection. Error: {e}")
+            st.error(f"Failed to fetch data from Google Sheet URL. Error: {e}")
         return pd.DataFrame()
 
 # --- Load Data and Handle Failure ---
 df = load_data(DATA_URL)
 
 if df.empty:
-    st.stop() # Stop the script if data failed to load
+    st.stop() 
 
-# The column names are now guaranteed to be clean.
+# Data Cleaning
 numeric_cols = ['child_expenditure_limit_assigned', 'success', 'pending', 're_initiated', 'balance']
-
-# Ensure numeric columns are actually numeric after loading
 for col in numeric_cols:
-    # IMPORTANT: The str.replace(r'[^\d.]', '', regex=True) line cleans out
-    # foreign characters, commas (if used as thousand separators), and non-numeric
-    # symbols, retaining only digits and periods (decimals). This is crucial for non-English locales.
     df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) 
 
 # --- Sidebar Filters ---
-st.sidebar.header("Filter Data")
+st.sidebar.markdown("## 🔍 Filter Expenditure Data")
 
-# --- Start Cascading Filters ---
-# 1. State Selection (Always independent)
+# --- Start Cascading Filters (Logic remains the same) ---
 selected_state = st.sidebar.selectbox(
     "Select State:",
     options=['All States'] + sorted(df['state'].astype(str).str.upper().unique().tolist())
 )
 
-# DataFrame filtered by State
 df_for_category_selection = df.copy()
 if selected_state != 'All States':
     df_for_category_selection = df_for_category_selection[df_for_category_selection['state'].astype(str).str.upper() == selected_state]
 
-# 2. Category Selection (Depends on State)
 selected_category = st.sidebar.selectbox(
     "Select Category:",
     options=['All Categories'] + sorted(df_for_category_selection['category'].astype(str).unique().tolist())
 )
 
-# DataFrame filtered by State and Category
 df_for_agency_selection = df_for_category_selection.copy()
 if selected_category != 'All Categories':
     df_for_agency_selection = df_for_agency_selection[df_for_agency_selection['category'] == selected_category]
 
-# 3. Agency Name Selection (Depends on State and Category)
 selected_agency = st.sidebar.selectbox(
     "Select Agency Name:",
     options=['All Agencies'] + sorted(df_for_agency_selection['agency_name'].astype(str).unique().tolist())
 )
 
-# DataFrame filtered by State, Category, and Agency Name
 df_for_unique_code_selection = df_for_agency_selection.copy()
 if selected_agency != 'All Agencies':
     df_for_unique_code_selection = df_for_unique_code_selection[df_for_unique_code_selection['agency_name'] == selected_agency]
 
-# 4. Unique ID Selection (Depends on State, Category, and Agency Name)
 selected_unique_id = st.sidebar.selectbox(
     "Agency Unique Code:",
     options=['All Codes'] + sorted(df_for_unique_code_selection['unique_id'].astype(str).unique().tolist())
 )
-# --- End Cascading Filters ---
 
-
-# Apply Filters (This block now ensures all 4 selections filter the data,
-# but the available options in 2, 3, and 4 are constrained by earlier selections.)
+# Apply Filters
 df_filtered = df.copy()
-
 if selected_state != 'All States':
     df_filtered = df_filtered[df_filtered['state'].astype(str).str.upper() == selected_state]
-
 if selected_category != 'All Categories':
     df_filtered = df_filtered[df_filtered['category'] == selected_category]
-
 if selected_agency != 'All Agencies':
     df_filtered = df_filtered[df_filtered['agency_name'] == selected_agency]
-
 if selected_unique_id != 'All Codes':
     df_filtered = df_filtered[df_filtered['unique_id'] == selected_unique_id]
 
-# Add instruction for theme switching in the sidebar (NEW)
-st.sidebar.info("To switch between Light and Dark mode, use the 'Settings' option in the main menu (☰) at the top right of the page.")
+# Add instruction for theme switching in the sidebar 
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Theme Toggle:** Use the main menu (☰) at the top right to switch between Light and Dark mode.")
 
 # --- 2. Calculate KPIs on Filtered Data ---
 total_limit = df_filtered['child_expenditure_limit_assigned'].sum()
 total_success = df_filtered['success'].sum()
 total_pending = df_filtered['pending'].sum()
-total_reinitiated = df_filtered['re_initiated'].sum() # NEW CALCULATION
+total_reinitiated = df_filtered['re_initiated'].sum()
 total_balance = df_filtered['balance'].sum()
 
-# Safe calculation for success rate
 success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 
-# --- 3. Dashboard Layout ---
-# Removed confusing theme comments, relying on native Streamlit theme selection
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Agency Dashboard")
-st.title("💰 Agency Expenditure Dashboard (Live Data)")
+# --- 3. Dashboard Layout (Beautified) ---
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Financial Dashboard")
+st.title("🌟 Financial Expenditure Dashboard: Real-Time Analysis")
+st.markdown("---") # Visual separation
 
-# Get the list of unique states in the filtered data for display
+# Get display data for header
 filtered_states = df_filtered['state'].astype(str).unique().tolist()
 display_states = ", ".join(filtered_states[:3])
 if len(filtered_states) > 3:
@@ -165,14 +136,12 @@ elif len(filtered_states) == 1:
 else:
     display_states = ", ".join(filtered_states)
     
-# Updated Markdown to show the State name(s) clearly
 st.markdown(f"""
-    **Data displayed for:** | **State(s):** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Auto-refreshes every 60 seconds.*
+    **Scope:** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Data refreshes live.*
 """)
-st.divider()
+st.markdown("---") # Visual separation
 
 # --- SCALING AND CURRENCY ---
-# To display amounts in Crores (Cr), we divide the sums by 10.
 CRORE_FACTOR = 10 
 CURRENCY_LABEL = "INR (Cr)" 
 
@@ -183,56 +152,102 @@ pending_cr = total_pending / CRORE_FACTOR
 reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
+# Determine color/delta cues for metrics
+success_rate_delta = "High" if success_rate > 50 else ("Low" if success_rate < 30 else "Moderate")
+delta_color = "inverse" if success_rate < 30 else "normal" # inverse=red/orange for low success rate
 
-# KPI Header - Now using 6 columns (Total Limit, Success, Success Rate, Pending, Re-Initiated, Balance)
+# KPI Header - 6 prominent columns
 col1, col2, col3, col4, col5, col6 = st.columns(6) 
 
 # Metrics: Total Limit, Total Success, Success Rate, Total Pending, Total Re-Initiated, Total Balance
 
 col1.metric(f"Total Budget Assigned ({CURRENCY_LABEL})", f"₹{limit_cr:,.2f}")
-col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta_color="normal")
-col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color="inverse")
+col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta=f"{success_rate_delta}", delta_color=delta_color)
+col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color=delta_color)
 col4.metric(f"Total Pending ({CURRENCY_LABEL})", f"₹{pending_cr:,.2f}")
 col5.metric(f"Total Re-Initiated ({CURRENCY_LABEL})", f"₹{reinitiated_cr:,.2f}")
-col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}")
+col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}", delta="Unspent", delta_color="inverse") # High balance is negative sentiment
+
+st.markdown("---") # Visual separation
 
 
-# --- Main Visualizations ---
+# --- Main Visualizations (Using Plotly Express) ---
 
 col_vis1, col_vis2 = st.columns(2)
 
-# Visualization 1: Expenditure Status by Category
+# Visualization 1: Expenditure Status by Category (Plotly Stacked Bar)
 with col_vis1:
-    st.subheader("📊 Expenditure Breakdown by Category Status")
-    # Group and ensure no NaN columns before sum
-    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum()
-    # Apply scaling for the chart data
-    category_summary_cr = category_summary / CRORE_FACTOR
-    category_summary_cr.columns = [f'Success ({CURRENCY_LABEL})', f'Pending ({CURRENCY_LABEL})', f'Re-Initiated ({CURRENCY_LABEL})']
-    st.bar_chart(category_summary_cr)
+    st.subheader("📊 Expenditure Status by Category")
+    
+    category_summary = df_filtered.groupby('category')[['success', 'pending', 're_initiated']].sum().reset_index()
+    
+    # Scale data for Plotly
+    category_summary_cr = category_summary[['category']].copy()
+    category_summary_cr[f'Success ({CURRENCY_LABEL})'] = category_summary['success'] / CRORE_FACTOR
+    category_summary_cr[f'Pending ({CURRENCY_LABEL})'] = category_summary['pending'] / CRORE_FACTOR
+    category_summary_cr[f'Re-Initiated ({CURRENCY_LABEL})'] = category_summary['re_initiated'] / CRORE_FACTOR
 
-# Visualization 2: Top 10 States by Limit
+    # Melt DataFrame for Plotly stacked bar chart
+    category_melted = pd.melt(
+        category_summary_cr, 
+        id_vars='category', 
+        value_vars=[f'Success ({CURRENCY_LABEL})', f'Pending ({CURRENCY_LABEL})', f'Re-Initiated ({CURRENCY_LABEL})'],
+        var_name='Status', 
+        value_name='Amount (Cr)'
+    )
+
+    fig1 = px.bar(
+        category_melted,
+        x='category',
+        y='Amount (Cr)',
+        color='Status',
+        title='Category Status (INR Cr)',
+        labels={'category': 'Agency Type'},
+        color_discrete_map={ # Custom colors for clarity
+            f'Success ({CURRENCY_LABEL})': '#2ecc71', # Green
+            f'Pending ({CURRENCY_LABEL})': '#f1c40f', # Yellow
+            f'Re-Initiated ({CURRENCY_LABEL})': '#3498db' # Blue
+        }
+    )
+    fig1.update_layout(xaxis_title=None, legend_title="Status", margin=dict(t=30, b=0, l=0, r=0))
+    st.plotly_chart(fig1, use_container_width=True)
+
+# Visualization 2: Top 10 States by Limit (Plotly Bar)
 with col_vis2:
     st.subheader("🗺️ Top 10 States by Limit Assigned")
     
-    # Check if a state filter is applied before showing Top 10 states
     if selected_state == 'All States':
         state_summary = df_filtered.groupby('state')['child_expenditure_limit_assigned'].sum().nlargest(10).reset_index()
-        # Apply scaling for the chart data
-        state_summary['child_expenditure_limit_assigned'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
-        state_summary = state_summary.set_index('state')
-        st.bar_chart(state_summary, y='child_expenditure_limit_assigned') # Explicitly use the scaled column
+        
+        # Apply scaling and rename column for Plotly
+        state_summary['Limit (Cr)'] = state_summary['child_expenditure_limit_assigned'] / CRORE_FACTOR
+        
+        fig2 = px.bar(
+            state_summary,
+            x='Limit (Cr)',
+            y='state',
+            orientation='h',
+            title='Top 10 States',
+            color='Limit (Cr)', # Color bars by value
+            color_continuous_scale=px.colors.sequential.Teal,
+            labels={'state': 'State'}
+        )
+        fig2.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=30, b=0, l=0, r=0))
+        st.plotly_chart(fig2, use_container_width=True)
     else:
-        st.info("Top 10 States chart is only available when 'All States' filter is selected.")
+        st.info("Top 10 States chart is filtered only when 'All States' is selected.")
 
 
-# --- Detailed Data Table ---
-st.divider()
-st.subheader("📋 Raw Data View")
+# --- Detailed Data Table (Using Expander) ---
+st.markdown("---")
+st.subheader("📋 Detailed Records")
+
 # Display data frame with scaled monetary columns for consistency (optional, but good practice)
 df_display = df_filtered.copy()
 for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-st.dataframe(df_display)
+# Use st.expander to hide the large table initially
+with st.expander("Click here to view the full list of filtered agency records"):
+    st.dataframe(df_display, use_container_width=True)
