@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import requests 
-import plotly.express as px # NEW: Imported for enhanced visualization
+import plotly.express as px
 
 # --- Configuration ---
 # Google Sheet ID extracted from your URL: 
@@ -15,6 +15,44 @@ CLEAN_COLUMN_NAMES = [
     'category', 'child_expenditure_limit_assigned', 'success', 
     'pending', 're_initiated', 'balance'
 ]
+
+# --- Custom CSS for UI/Aesthetics (NEW) ---
+st.markdown(
+    """
+    <style>
+    /* Bolder sidebar header */
+    .css-1d391kg, .css-1lcbmhc {
+        font-weight: 600;
+        font-size: 1.2rem;
+    }
+    
+    /* Custom styling for metrics to make them stand out */
+    [data-testid="stMetric"] {
+        padding: 10px 0px;
+        background-color: #f0f2f6; /* Light gray background for contrast */
+        border-radius: 10px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.05);
+        margin-bottom: 10px;
+    }
+
+    /* Change the main header font/style */
+    h1 {
+        font-size: 2.5rem;
+        color: #1f77b4; /* A nice blue color */
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+    
+    /* Remove default Streamlit padding at the top */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Function to load data safely and efficiently
 @st.cache_data(ttl=60) # Cache for 60 seconds to enable "real-time" feel
@@ -59,7 +97,7 @@ for col in numeric_cols:
     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0) 
 
 # --- Sidebar Filters ---
-st.sidebar.markdown("## 🔍 Filter Expenditure Data")
+st.sidebar.markdown("## 🔍 **FILTER EXPENDITURE DATA**") # Bolder sidebar title
 
 # --- Start Cascading Filters (Logic remains the same) ---
 selected_state = st.sidebar.selectbox(
@@ -121,8 +159,8 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 # --- 3. Dashboard Layout (Beautified) ---
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Financial Dashboard")
-st.title("🌟 Financial Expenditure Dashboard: Real-Time Analysis")
-st.markdown("---") # Visual separation
+st.title("📊 Financial Expenditure Dashboard: Live Performance") # Updated title
+st.markdown("---") 
 
 # Get display data for header
 filtered_states = df_filtered['state'].astype(str).unique().tolist()
@@ -137,9 +175,9 @@ else:
     display_states = ", ".join(filtered_states)
     
 st.markdown(f"""
-    **Scope:** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** | *Data refreshes live.*
+    **Current Scope:** **{display_states}** | **Category:** **{selected_category}** | **Agency:** **{selected_agency}** | **Code:** **{selected_unique_id}** *<sub>Data updates live from the source.</sub>*
 """)
-st.markdown("---") # Visual separation
+st.markdown("---") 
 
 # --- SCALING AND CURRENCY ---
 CRORE_FACTOR = 10 
@@ -153,8 +191,8 @@ reinitiated_cr = total_reinitiated / CRORE_FACTOR
 balance_cr = total_balance / CRORE_FACTOR
 
 # Determine color/delta cues for metrics
-success_rate_delta = "High" if success_rate > 50 else ("Low" if success_rate < 30 else "Moderate")
-delta_color = "inverse" if success_rate < 30 else "normal" # inverse=red/orange for low success rate
+success_rate_delta = "Excellent" if success_rate > 80 else ("Good" if success_rate > 50 else ("Needs Review" if success_rate < 30 else "Moderate"))
+delta_color = "inverse" if success_rate < 30 else "normal" 
 
 # KPI Header - 6 prominent columns
 col1, col2, col3, col4, col5, col6 = st.columns(6) 
@@ -166,9 +204,9 @@ col2.metric(f"Total Success ({CURRENCY_LABEL})", f"₹{success_cr:,.2f}", delta=
 col3.metric("Success Rate", f"{success_rate:,.2f}%", delta_color=delta_color)
 col4.metric(f"Total Pending ({CURRENCY_LABEL})", f"₹{pending_cr:,.2f}")
 col5.metric(f"Total Re-Initiated ({CURRENCY_LABEL})", f"₹{reinitiated_cr:,.2f}")
-col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}", delta="Unspent", delta_color="inverse") # High balance is negative sentiment
+col6.metric(f"Total Balance ({CURRENCY_LABEL})", f"₹{balance_cr:,.2f}", delta="Unspent", delta_color="inverse")
 
-st.markdown("---") # Visual separation
+st.markdown("---") 
 
 
 # --- Main Visualizations (Using Plotly Express) ---
@@ -203,10 +241,10 @@ with col_vis1:
         color='Status',
         title='Category Status (INR Cr)',
         labels={'category': 'Agency Type'},
-        color_discrete_map={ # Custom colors for clarity
-            f'Success ({CURRENCY_LABEL})': '#2ecc71', # Green
-            f'Pending ({CURRENCY_LABEL})': '#f1c40f', # Yellow
-            f'Re-Initiated ({CURRENCY_LABEL})': '#3498db' # Blue
+        color_discrete_map={ # Custom colors for better aesthetic
+            f'Success ({CURRENCY_LABEL})': '#27AE60', # Brighter Green
+            f'Pending ({CURRENCY_LABEL})': '#F39C12', # Orange/Yellow
+            f'Re-Initiated ({CURRENCY_LABEL})': '#3498DB' # Light Blue
         }
     )
     fig1.update_layout(xaxis_title=None, legend_title="Status", margin=dict(t=30, b=0, l=0, r=0))
@@ -228,8 +266,8 @@ with col_vis2:
             y='state',
             orientation='h',
             title='Top 10 States',
-            color='Limit (Cr)', # Color bars by value
-            color_continuous_scale=px.colors.sequential.Teal,
+            color='Limit (Cr)', 
+            color_continuous_scale=px.colors.sequential.Sunsetdark, # New attractive color scale
             labels={'state': 'State'}
         )
         fig2.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=30, b=0, l=0, r=0))
