@@ -16,6 +16,11 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
+# --- LOGO URLS (PLACEHOLDERS - REPLACE THESE WITH YOUR STABLE LINKS) ---
+# NOTE: Replace these URLs with stable, public links to your DST and MoST logos.
+LOGO_URL_DST = "https://i.imgur.com/example/dst_logo.png" 
+LOGO_URL_MOST = "https://i.imgur.com/example/most_logo.png" 
+
 # --- Custom CSS for UI/Aesthetics (Enhanced with Animations) ---
 st.markdown(
     """
@@ -61,7 +66,8 @@ st.markdown(
         color: #1f77b4; 
         font-weight: 700;
         margin-bottom: 5px;
-        animation: subtle-float 5s ease-in-out infinite; /* Slow, gentle float */
+        /* Animation applied to the title */
+        animation: subtle-float 5s ease-in-out infinite; 
     }
     
     /* Style for Visualization Containers (Chart "Cards") */
@@ -83,6 +89,12 @@ st.markdown(
     .block-container {
         padding-top: 1rem;
         padding-bottom: 1rem;
+    }
+    /* Style for images in the header columns */
+    [data-testid="column"] img {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
     }
     </style>
     """,
@@ -160,7 +172,7 @@ selected_agency = st.sidebar.selectbox(
 
 df_for_unique_code_selection = df_for_agency_selection.copy()
 if selected_agency != 'All Agencies':
-    df_for_unique_code_selection = df_for_unique_code_selection[df_for_unique_code_selection['agency_name'] == selected_agency]
+    df_for_unique_code_selection = df_for_unique_code_selection[df_for_agency_selection['agency_name'] == selected_agency]
 
 selected_unique_id = st.sidebar.selectbox(
     "Agency Unique Code:",
@@ -194,7 +206,22 @@ success_rate = (total_success / total_limit) * 100 if total_limit != 0 else 0
 
 # --- 3. Dashboard Layout (Beautified) ---
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Financial Dashboard")
-st.title("📊 **Financial Expenditure Dashboard: Live Performance**") 
+
+# --- NEW HEADER WITH LOGOS ---
+col_logo1, col_title, col_logo2 = st.columns([1, 4, 1])
+
+with col_logo1:
+    # Display DST Logo
+    st.image(LOGO_URL_DST, width=80) 
+
+with col_title:
+    # Main Title
+    st.title("📊 **Financial Expenditure Dashboard: Live Performance**") 
+
+with col_logo2:
+    # Display MoST Logo
+    st.image(LOGO_URL_MOST, width=80) 
+    
 st.markdown("---") 
 
 # Get display data for header
