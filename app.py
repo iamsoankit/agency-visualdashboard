@@ -16,7 +16,7 @@ CLEAN_COLUMN_NAMES = [
     'pending', 're_initiated', 'balance'
 ]
 
-# --- Custom CSS for UI/Aesthetics (NEW) ---
+# --- Custom CSS for UI/Aesthetics (UPDATED) ---
 st.markdown(
     """
     <style>
@@ -26,14 +26,15 @@ st.markdown(
         font-size: 1.2rem;
     }
     
-    /* Custom styling for metrics to make them stand out */
+    /* Custom styling for metrics to make them stand out in both light/dark mode */
     [data-testid="stMetric"] {
         padding: 10px 0px;
-        background-color: #f0f2f6; /* Light gray background for contrast */
+        /* Removed background-color: #f0f2f6; to ensure visibility in Dark Mode */
         border-radius: 10px;
-        border: 1px solid #e0e0e0;
+        border: 1px solid rgba(150, 150, 150, 0.4); /* Use a subtle border for definition */
         box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.05);
         margin-bottom: 10px;
+        background-color: var(--background-color-card); /* Optional: use Streamlit's built-in background variable */
     }
 
     /* Change the main header font/style */
