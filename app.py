@@ -290,4 +290,4 @@ for col in numeric_cols:
     df_display[f'{col} ({CURRENCY_LABEL})'] = df_display[col] / CRORE_FACTOR
     df_display = df_display.drop(columns=[col])
 
-st.dataframe(df_display, use_container
+st.dataframe(df_display, use_container_width=True)
