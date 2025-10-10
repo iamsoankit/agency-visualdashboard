@@ -18,7 +18,7 @@ SHEET_ID = '1cRXv_5qkGmfYtrRcXRqDrRnZKnBzoabf95yb9zh5Koo'
 
 # The gid (internal sheet ID) is for the specific sheet tab within the file (MAIN DATA 07.10.25)
 
-GID = '1933215839' 
+GID = '1933215839'
 
 
 
